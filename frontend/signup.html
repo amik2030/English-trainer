@@ -191,6 +191,8 @@
             const password = document.getElementById('password').value;
             const submitBtn = this.querySelector('.signup-btn');
             
+            console.log('Signup attempt:', { email });
+            
             submitBtn.textContent = 'Creating account...';
             submitBtn.disabled = true;
             
@@ -200,7 +202,10 @@
                     password: password
                 });
                 
+                console.log('Signup response:', { data, error });
+                
                 if (error) {
+                    console.error('Signup error:', error);
                     alert('Signup failed: ' + error.message);
                     submitBtn.textContent = 'Sign Up';
                     submitBtn.disabled = false;
@@ -208,13 +213,20 @@
                 }
                 
                 if (data.session) {
+                    console.log('Session created, redirecting to dashboard');
                     localStorage.setItem('sb_access_token', data.session.access_token);
                     window.location.href = 'dashboard.html';
+                } else if (data.user) {
+                    console.log('User created but no session (email confirmation may be required)');
+                    alert('Account created! Please check your email to confirm, then sign in.');
+                    window.location.href = 'login.html';
                 } else {
+                    console.log('No session or user returned');
                     alert('Account created! Please sign in.');
                     window.location.href = 'login.html';
                 }
             } catch (err) {
+                console.error('Exception during signup:', err);
                 alert('Signup failed: ' + err.message);
                 submitBtn.textContent = 'Sign Up';
                 submitBtn.disabled = false;
