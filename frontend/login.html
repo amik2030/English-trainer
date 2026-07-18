@@ -351,8 +351,8 @@
                 // Store session token for API calls
                 localStorage.setItem('sb_access_token', data.session.access_token);
                 
-                // Redirect to practice
-                window.location.href = 'practice.html';
+                // Redirect to dashboard
+                window.location.href = 'dashboard.html';
             } catch (err) {
                 alert('Login failed: ' + err.message);
                 submitBtn.textContent = 'Sign In';

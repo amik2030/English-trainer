@@ -578,6 +578,14 @@ async def serve_practice():
     raise HTTPException(status_code=404, detail="Practice page not found")
 
 
+@app.get("/dashboard.html")
+async def serve_dashboard():
+    dashboard_path = Path(__file__).parent.parent / "frontend" / "dashboard.html"
+    if dashboard_path.exists():
+        return FileResponse(dashboard_path)
+    raise HTTPException(status_code=404, detail="Dashboard page not found")
+
+
 @app.get("/login.html")
 async def serve_login():
     login_path = Path(__file__).parent.parent / "frontend" / "login.html"
