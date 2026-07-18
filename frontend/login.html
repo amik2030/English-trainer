@@ -286,15 +286,15 @@
     <script>
         // Initialize Supabase client
         const SUPABASE_URL = 'https://qiablkjhbpybhqcshjo.supabase.co';
-        const SUPABASE_ANON_KEY = '***';
+        const SUPABASE_ANON_KEY = 'sb_publishable_k514gfd5YtchDsftJjRqUw_w5uEBayH';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         // Check if user is already logged in
         async function checkAuth() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                // User is logged in, redirect to trainer
-                window.location.href = 'trainer.html';
+                // User is logged in, redirect to practice
+                window.location.href = 'practice.html';
             }
         }
         checkAuth();
@@ -325,8 +325,8 @@
                 // Store session token for API calls
                 localStorage.setItem('sb_access_token', data.session.access_token);
                 
-                // Redirect to trainer
-                window.location.href = 'trainer.html';
+                // Redirect to practice
+                window.location.href = 'practice.html';
             } catch (err) {
                 alert('Login failed: ' + err.message);
                 submitBtn.textContent = 'Sign In';
@@ -398,7 +398,7 @@
                     if (data.session) {
                         // Auto-logged in (email confirmation disabled)
                         localStorage.setItem('sb_access_token', data.session.access_token);
-                        window.location.href = 'trainer.html';
+                        window.location.href = 'practice.html';
                     } else {
                         alert('Check your email to confirm your account!');
                     }
