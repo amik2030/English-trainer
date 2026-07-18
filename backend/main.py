@@ -58,9 +58,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Conversation history per session (in-memory for MVP)
-sessions = {}
-
 # Mount static files for frontend
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
@@ -102,12 +99,11 @@ async def get_current_user(authorization: str = Header(None)) -> dict:
 # ============================================
 
 class MessageRequest(BaseModel):
-    session_id: str
+    conversation_id: str
     message: str
 
 
 class ConversationStart(BaseModel):
-    session_id: str
     topic: str = "general conversation"
     level: str = "intermediate"
 
@@ -194,10 +190,9 @@ async def start_conversation(
     """
     Start a new conversation session with AI tutor
     """
-    session_id = request.session_id
     user_id = user["id"]
     
-    # Initialize session with system prompt
+    # Initialize system prompt
     system_prompt = f"""You are a friendly and patient English conversation tutor. 
     Your student is at {request.level} level and wants to practice {request.topic}.
     
@@ -212,14 +207,6 @@ async def start_conversation(
     If the student makes a mistake, provide the correction in parentheses after your response.
     """
     
-    sessions[session_id] = {
-        "messages": [{"role": "system", "content": system_prompt}],
-        "topic": request.topic,
-        "level": request.level,
-        "user_id": user_id,
-        "start_time": datetime.now().isoformat()
-    }
-    
     # Generate opening message
     opening_messages = [
         {"role": "system", "content": system_prompt},
@@ -227,29 +214,38 @@ async def start_conversation(
     ]
     
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-3.5-turbo",
         messages=opening_messages,
         max_tokens=150
     )
     
     tutor_message = response.choices[0].message.content
-    sessions[session_id]["messages"].append({"role": "assistant", "content": tutor_message})
     
     # Create conversation record in Supabase
     try:
-        supabase.table("conversations").insert({
+        result = supabase.table("conversations").insert({
             "user_id": user_id,
-            "session_id": session_id,
             "topic": request.topic,
             "level": request.level,
             "start_time": datetime.now().isoformat()
         }).execute()
+        
+        conversation_id = result.data[0]["id"]
+        
+        # Save opening message
+        supabase.table("messages").insert({
+            "conversation_id": conversation_id,
+            "user_id": user_id,
+            "role": "assistant",
+            "content": tutor_message
+        }).execute()
+        
     except Exception as e:
-        print(f"Failed to create conversation record: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create conversation: {str(e)}")
     
     return {
-        "session_id": session_id,
-        "tutor_message": tutor_message
+        "conversation_id": conversation_id,
+        "greeting": tutor_message
     }
 
 
@@ -261,64 +257,85 @@ async def send_message(
     """
     Send a message in the conversation and get tutor response
     """
-    session_id = request.session_id
+    conversation_id = request.conversation_id
     user_id = user["id"]
     
-    if session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Add user message to history
-    user_message = {
-        "role": "user",
-        "content": request.message,
-        "timestamp": datetime.now().isoformat()
-    }
-    sessions[session_id]["messages"].append(user_message)
+    # Load conversation from Supabase
+    try:
+        conv_result = supabase.table("conversations").select("*").eq("id", conversation_id).eq("user_id", user_id).execute()
+        
+        if not conv_result.data:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        conversation = conv_result.data[0]
+        # Reconstruct system prompt from topic and level
+        system_prompt = f"""You are a friendly and patient English conversation tutor. 
+        Your student is at {conversation.get('level', 'intermediate')} level and wants to practice {conversation.get('topic', 'general conversation')}.
+        
+        Your role:
+        - Engage in natural conversation
+        - Gently correct grammar and vocabulary mistakes
+        - Suggest more natural or idiomatic expressions
+        - Ask follow-up questions to keep conversation flowing
+        - Be encouraging and supportive
+        
+        Keep responses concise (2-4 sentences) to maintain conversation flow.
+        If the student makes a mistake, provide the correction in parentheses after your response.
+        """
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load conversation: {str(e)}")
     
     # Save user message to Supabase
     try:
-        # Get conversation_id
-        conv_result = supabase.table("conversations").select("id").eq("session_id", session_id).execute()
-        if conv_result.data:
-            conversation_id = conv_result.data[0]["id"]
-            
-            supabase.table("messages").insert({
-                "conversation_id": conversation_id,
-                "user_id": user_id,
-                "role": "user",
-                "content": request.message
-            }).execute()
+        supabase.table("messages").insert({
+            "conversation_id": conversation_id,
+            "user_id": user_id,
+            "role": "user",
+            "content": request.message
+        }).execute()
     except Exception as e:
-        print(f"Failed to save user message: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save user message: {str(e)}")
+    
+    # Load message history from Supabase
+    try:
+        messages_result = supabase.table("messages").select("role, content").eq("conversation_id", conversation_id).order("created_at").execute()
+        
+        # Build message history for OpenAI
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in messages_result.data:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load message history: {str(e)}")
     
     # Get tutor response
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=sessions[session_id]["messages"],
-        max_tokens=200
-    )
-    
-    tutor_message = response.choices[0].message.content
-    sessions[session_id]["messages"].append({
-        "role": "assistant",
-        "content": tutor_message,
-        "timestamp": datetime.now().isoformat()
-    })
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=200
+        )
+        
+        tutor_message = response.choices[0].message.content
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get AI response: {str(e)}")
     
     # Save assistant message to Supabase
     try:
-        if conv_result.data:
-            supabase.table("messages").insert({
-                "conversation_id": conversation_id,
-                "user_id": user_id,
-                "role": "assistant",
-                "content": tutor_message
-            }).execute()
+        supabase.table("messages").insert({
+            "conversation_id": conversation_id,
+            "user_id": user_id,
+            "role": "assistant",
+            "content": tutor_message
+        }).execute()
     except Exception as e:
+        # Log but don't fail - message was already generated
         print(f"Failed to save assistant message: {e}")
     
     return {
-        "tutor_message": tutor_message
+        "response": tutor_message
     }
 
 

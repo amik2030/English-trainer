@@ -22,7 +22,7 @@ CREATE TABLE public.profiles (
 CREATE TABLE public.conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    session_id TEXT NOT NULL,
+    session_id TEXT,
     topic TEXT DEFAULT 'general conversation',
     level TEXT DEFAULT 'intermediate',
     start_time TIMESTAMPTZ DEFAULT NOW(),
