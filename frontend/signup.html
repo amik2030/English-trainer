@@ -147,6 +147,9 @@
             </div>
 
             <form class="signup-form" id="signupForm">
+                <div id="errorMessage" style="display: none; background: #ffe0e0; color: #d32f2f; padding: 12px; border-radius: 8px; margin-bottom: 16px;"></div>
+                <div id="successMessage" style="display: none; background: #e0ffe0; color: #2f7d2f; padding: 12px; border-radius: 8px; margin-bottom: 16px;"></div>
+                
                 <div class="form-group">
                     <label for="email">Email Address</label>
                     <input type="email" id="email" name="email" placeholder="you@example.com" required>
@@ -187,11 +190,29 @@
         // Signup form handler
         document.getElementById('signupForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const email = document.getElementById('email').value;
+            
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const submitBtn = this.querySelector('.signup-btn');
+            const errorDiv = document.getElementById('errorMessage');
+            const successDiv = document.getElementById('successMessage');
             
-            console.log('Signup attempt:', { email });
+            // Hide any previous messages
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            // Validate inputs
+            if (!email || !password) {
+                errorDiv.textContent = 'Please fill in all fields';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            if (password.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters';
+                errorDiv.style.display = 'block';
+                return;
+            }
             
             submitBtn.textContent = 'Creating account...';
             submitBtn.disabled = true;
@@ -202,32 +223,38 @@
                     password: password
                 });
                 
-                console.log('Signup response:', { data, error });
-                
                 if (error) {
-                    console.error('Signup error:', error);
-                    alert('Signup failed: ' + error.message);
+                    errorDiv.textContent = 'Signup failed: ' + error.message;
+                    errorDiv.style.display = 'block';
                     submitBtn.textContent = 'Sign Up';
                     submitBtn.disabled = false;
                     return;
                 }
                 
+                // Success - redirect to dashboard
                 if (data.session) {
-                    console.log('Session created, redirecting to dashboard');
                     localStorage.setItem('sb_access_token', data.session.access_token);
-                    window.location.href = 'dashboard.html';
+                    successDiv.textContent = 'Account created! Redirecting to dashboard...';
+                    successDiv.style.display = 'block';
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 1000);
                 } else if (data.user) {
-                    console.log('User created but no session (email confirmation may be required)');
-                    alert('Account created! Please check your email to confirm, then sign in.');
-                    window.location.href = 'login.html';
+                    // User created but email confirmation might be required
+                    successDiv.textContent = 'Account created! Redirecting to login...';
+                    successDiv.style.display = 'block';
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
                 } else {
-                    console.log('No session or user returned');
-                    alert('Account created! Please sign in.');
-                    window.location.href = 'login.html';
+                    errorDiv.textContent = 'Unexpected response. Please try again.';
+                    errorDiv.style.display = 'block';
+                    submitBtn.textContent = 'Sign Up';
+                    submitBtn.disabled = false;
                 }
             } catch (err) {
-                console.error('Exception during signup:', err);
-                alert('Signup failed: ' + err.message);
+                errorDiv.textContent = 'An error occurred: ' + err.message;
+                errorDiv.style.display = 'block';
                 submitBtn.textContent = 'Sign Up';
                 submitBtn.disabled = false;
             }
