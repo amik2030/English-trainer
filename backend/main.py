@@ -124,6 +124,14 @@ async def root():
     return {"message": "SpeakEasy AI API", "status": "running"}
 
 
+@app.get("/index.html")
+async def serve_index():
+    index_path = Path(__file__).parent.parent / "frontend" / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    raise HTTPException(status_code=404, detail="Index page not found")
+
+
 @app.post("/api/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
