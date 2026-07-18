@@ -545,6 +545,14 @@ async def serve_trainer():
     raise HTTPException(status_code=404, detail="Trainer page not found")
 
 
+@app.get("/practice.html")
+async def serve_practice():
+    practice_path = Path(__file__).parent.parent / "frontend" / "practice.html"
+    if practice_path.exists():
+        return FileResponse(practice_path)
+    raise HTTPException(status_code=404, detail="Practice page not found")
+
+
 @app.get("/login.html")
 async def serve_login():
     login_path = Path(__file__).parent.parent / "frontend" / "login.html"
