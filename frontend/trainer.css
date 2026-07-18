@@ -1,0 +1,308 @@
+/* Trainer-specific styles */
+body {
+    padding-top: 70px;
+}
+
+.trainer-app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: calc(100vh - 70px);
+    background: #f5f6fa;
+    display: flex;
+    flex-direction: column;
+}
+
+.trainer-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.trainer-header h1 { font-size: 18px; font-weight: 700; }
+.trainer-header .header-status {
+    font-size: 12px;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.screen { display: none; flex-direction: column; flex: 1; }
+.screen.active { display: flex; }
+
+/* Home Screen */
+.home-screen { overflow-y: auto; padding: 20px; flex: 1; }
+.welcome-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+.welcome-card h2 { font-size: 22px; margin-bottom: 8px; }
+.welcome-card p { font-size: 14px; opacity: 0.9; }
+.setup-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.trainer-form-group { margin-bottom: 18px; }
+.trainer-form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #636e72;
+    margin-bottom: 8px;
+}
+.trainer-form-group input, .trainer-form-group select {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 16px;
+}
+.trainer-form-group input:focus, .trainer-form-group select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+.start-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.stat-card {
+    background: white;
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.stat-card-value { font-size: 24px; font-weight: 800; color: #667eea; }
+.stat-card-label { font-size: 11px; color: #636e72; text-transform: uppercase; }
+
+/* Chat Screen */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background: #f5f6fa;
+}
+.message {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+}
+.message.user { flex-direction: row-reverse; }
+.message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.message.tutor .message-avatar { background: linear-gradient(135deg, #667eea, #764ba2); }
+.message.user .message-avatar { background: #dfe6e9; }
+.message-content {
+    max-width: 78%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    font-size: 15px;
+    line-height: 1.5;
+}
+.message.tutor .message-content {
+    background: white;
+    border-bottom-left-radius: 6px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+.message.user .message-content {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-bottom-right-radius: 6px;
+}
+.audio-btn {
+    background: #667eea;
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+}
+.audio-btn:active { transform: scale(0.95); }
+
+/* Chat Input */
+.chat-input-bar {
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    padding: 12px 16px;
+}
+.chat-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+.chat-stat-value { font-size: 16px; font-weight: 700; color: #667eea; }
+.chat-stat-label { font-size: 10px; color: #636e72; text-transform: uppercase; }
+.transcript {
+    background: #f5f6fa;
+    border-radius: 12px;
+    padding: 12px 16px;
+    min-height: 44px;
+    font-size: 14px;
+    color: #636e72;
+    margin-bottom: 12px;
+    text-align: center;
+}
+.controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+.record-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #ff4757;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.record-btn.recording { animation: pulse 1.5s infinite; }
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.6); }
+    50% { box-shadow: 0 0 0 16px rgba(255, 71, 87, 0); }
+}
+.record-btn svg { width: 24px; height: 24px; fill: white; }
+.end-btn {
+    flex: 1;
+    padding: 14px;
+    background: #ff4757;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Bottom Nav */
+.bottom-nav {
+    display: flex;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+}
+.nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 0 8px;
+    cursor: pointer;
+    color: #636e72;
+    font-size: 10px;
+    font-weight: 600;
+    border: none;
+    background: none;
+}
+.nav-item.active { color: #667eea; }
+.nav-item-icon { font-size: 22px; margin-bottom: 3px; }
+
+/* ── Responsive: Tablet ── */
+@media (min-width: 768px) {
+    .trainer-app { max-width: 100%; }
+    .home-screen {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+        gap: 24px;
+        padding: 32px;
+        align-content: start;
+    }
+    .welcome-card { grid-column: 1 / -1; }
+    .setup-card { margin-bottom: 0; }
+    .stats-grid { margin-bottom: 0; }
+    .trainer-header { padding: 16px 32px; }
+    .chat-messages { padding: 24px 32px; }
+    .chat-input-bar { padding: 16px 32px; }
+    .message-content { max-width: 60%; font-size: 16px; }
+    .controls { max-width: 480px; margin: 0 auto; }
+    .bottom-nav { padding: 0 32px; }
+}
+
+/* ── Responsive: Desktop ── */
+@media (min-width: 1024px) {
+    .home-screen {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px;
+    }
+    .chat-messages {
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    .chat-input-bar {
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    .message-content { max-width: 50%; }
+}
+
+/* ── Landscape phone ── */
+@media (max-height: 500px) and (orientation: landscape) {
+    .trainer-header { padding: 8px 16px; }
+    .trainer-header h1 { font-size: 15px; }
+    .trainer-header .header-status { font-size: 11px; padding: 3px 8px; }
+    .screen { height: calc(100vh - 40px); }
+    .welcome-card { padding: 16px; margin-bottom: 12px; }
+    .welcome-card h2 { font-size: 18px; }
+    .welcome-card p { font-size: 13px; }
+    .setup-card { padding: 14px; margin-bottom: 12px; }
+    .trainer-form-group { margin-bottom: 10px; }
+    .trainer-form-group input, .trainer-form-group select { padding: 10px 12px; }
+    .start-btn { padding: 12px; font-size: 15px; }
+    .stats-grid { gap: 8px; margin-bottom: 12px; }
+    .stat-card { padding: 10px; }
+    .chat-input-bar { padding: 8px 12px; }
+    .chat-stats { margin-bottom: 6px; padding-bottom: 6px; }
+    .transcript { padding: 8px 12px; min-height: 32px; margin-bottom: 8px; }
+    .controls { gap: 8px; }
+    .record-btn { width: 44px; height: 44px; }
+    .end-btn { padding: 10px; font-size: 14px; }
+    .bottom-nav { display: none; }
+    .message-content { padding: 8px 12px; font-size: 14px; }
+}
+
+/* ── Safe area for notched devices ── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .bottom-nav {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .chat-input-bar {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+}
