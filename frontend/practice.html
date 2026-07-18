@@ -314,6 +314,12 @@
     </div>
 
     <script>
+        // Check authentication
+        const token = localStorage.getItem('sb_access_token');
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+
         // State
         let currentTopic = 'daily-life';
         let conversationId = null;
@@ -324,6 +330,7 @@
         let turnCount = 0;
         let sessionStartTime = null;
         let timerInterval = null;
+        const authToken = token;
 
         // Topic selection
         document.querySelectorAll('.topic-btn').forEach(btn => {
@@ -390,6 +397,9 @@
 
                 const response = await fetch('/api/speak', {
                     method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
                     body: formData
                 });
 
@@ -410,7 +420,10 @@
                 if (conversationId && data.transcription) {
                     const convResponse = await fetch('/api/conversation/message', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${authToken}`
+                        },
                         body: JSON.stringify({
                             conversation_id: conversationId,
                             message: data.transcription
@@ -465,7 +478,10 @@
             try {
                 const response = await fetch('/api/conversation/start', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
                     body: JSON.stringify({ topic: currentTopic })
                 });
 
