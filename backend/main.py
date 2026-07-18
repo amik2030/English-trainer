@@ -594,6 +594,14 @@ async def serve_login():
     raise HTTPException(status_code=404, detail="Login page not found")
 
 
+@app.get("/signup.html")
+async def serve_signup():
+    signup_path = Path(__file__).parent.parent / "frontend" / "signup.html"
+    if signup_path.exists():
+        return FileResponse(signup_path)
+    raise HTTPException(status_code=404, detail="Signup page not found")
+
+
 @app.get("/styles.css")
 async def serve_styles():
     css_path = Path(__file__).parent.parent / "frontend" / "styles.css"

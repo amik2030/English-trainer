@@ -242,33 +242,7 @@
             </div>
 
             <div class="login-footer">
-                Don't have an account? <a href="#" id="showSignup">Sign up free</a>
-            </div>
-
-            <!-- Signup Form (hidden by default) -->
-            <div id="signupForm" style="display: none;">
-                <div class="login-header">
-                    <h1>Create Account</h1>
-                    <p>Start your English speaking journey</p>
-                </div>
-
-                <form class="login-form" id="signupFormElement">
-                    <div class="form-group">
-                        <label for="signupEmail">Email Address</label>
-                        <input type="email" id="signupEmail" name="email" placeholder="you@example.com" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="signupPassword">Password</label>
-                        <input type="password" id="signupPassword" name="password" placeholder="Min 6 characters" required minlength="6">
-                    </div>
-
-                    <button type="submit" class="login-btn">Sign Up</button>
-                </form>
-
-                <div class="login-footer">
-                    Already have an account? <a href="#" id="showLogin">Sign in</a>
-                </div>
+                Don't have an account? <a href="signup.html">Sign up free</a>
             </div>
         </div>
     </section>
@@ -397,71 +371,6 @@
                 // Supabase will redirect to Google, then back to trainer.html
             } catch (err) {
                 alert('Google login failed: ' + err.message);
-            }
-        });
-
-        // Show/hide signup form
-        const loginFormSection = document.querySelector('.login-form').parentElement;
-        const signupFormSection = document.getElementById('signupForm');
-
-        document.getElementById('showSignup').addEventListener('click', function(e) {
-            e.preventDefault();
-            // Hide login form elements
-            document.querySelector('.login-header').style.display = 'none';
-            document.querySelector('.login-form').style.display = 'none';
-            document.querySelector('.divider').style.display = 'none';
-            document.querySelector('.social-login').style.display = 'none';
-            document.querySelectorAll('.login-footer')[0].style.display = 'none';
-            // Show signup form
-            signupFormSection.style.display = 'block';
-        });
-
-        document.getElementById('showLogin').addEventListener('click', function(e) {
-            e.preventDefault();
-            // Show login form elements
-            document.querySelector('.login-header').style.display = 'block';
-            document.querySelector('.login-form').style.display = 'block';
-            document.querySelector('.divider').style.display = 'block';
-            document.querySelector('.social-login').style.display = 'block';
-            document.querySelectorAll('.login-footer')[0].style.display = 'block';
-            // Hide signup form
-            signupFormSection.style.display = 'none';
-        });
-
-        // Signup form handler
-        document.getElementById('signupFormElement').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const email = document.getElementById('signupEmail').value;
-            const password = document.getElementById('signupPassword').value;
-            const submitBtn = this.querySelector('.login-btn');
-            
-            submitBtn.textContent = 'Creating account...';
-            submitBtn.disabled = true;
-            
-            try {
-                const { data, error } = await supabase.auth.signUp({
-                    email: email,
-                    password: password
-                });
-                
-                if (error) {
-                    alert('Signup failed: ' + error.message);
-                    submitBtn.textContent = 'Sign Up';
-                    submitBtn.disabled = false;
-                    return;
-                }
-                
-                if (data.session) {
-                    localStorage.setItem('sb_access_token', data.session.access_token);
-                    window.location.href = 'practice.html';
-                } else {
-                    alert('Account created! Please sign in.');
-                    document.getElementById('showLogin').click();
-                }
-            } catch (err) {
-                alert('Signup failed: ' + err.message);
-                submitBtn.textContent = 'Sign Up';
-                submitBtn.disabled = false;
             }
         });
     </script>
