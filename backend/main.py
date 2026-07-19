@@ -28,15 +28,15 @@ load_dotenv()
 # ============================================
 
 # OpenAI
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_API_KEY = ***"OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable is required")
+    *** ValueError("OPENAI_API_KEY environment variable is required")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+SUPABASE_KEY = ***"SUPABASE_KEY")
+SUPABASE_SERVICE_KEY = ***"SUPABASE_SERVICE_KEY")
 if not all([SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY]):
     raise ValueError("Supabase environment variables are required")
 
@@ -72,7 +72,6 @@ async def get_current_user(authorization: str = Header(None)) -> dict:
     """
     Extract and verify user from JWT token in Authorization header
     Returns user dict with id, email
-    Auto-creates profile if it doesn't exist
     """
     if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header required")
@@ -87,28 +86,9 @@ async def get_current_user(authorization: str = Header(None)) -> dict:
     try:
         # Verify JWT token with Supabase
         user = supabase_admin.auth.get_user(token)
-        user_id = user.user.id
-        user_email = user.user.email
-        
-        # Auto-create profile if it doesn't exist
-        try:
-            profile_check = supabase_admin.table("profiles").select("id").eq("id", user_id).execute()
-            if not profile_check.data:
-                supabase_admin.table("profiles").insert({
-                    "id": user_id,
-                    "email": user_email,
-                    "display_name": user_email.split("@")[0],
-                    "level": "intermediate",
-                    "total_sessions": 0,
-                    "total_words": 0,
-                    "total_minutes": 0
-                }).execute()
-        except Exception:
-            pass
-        
         return {
-            "id": user_id,
-            "email": user_email
+            "id": user.user.id,
+            "email": user.user.email
         }
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
@@ -210,8 +190,6 @@ async def start_conversation(
     """
     Start a new conversation session with AI tutor
     """
-    user_id = user["id"]
-    
     # Initialize system prompt
     system_prompt = f"""You are a friendly and patient English conversation tutor. 
     Your student is at {request.level} level and wants to practice {request.topic}.
@@ -241,10 +219,9 @@ async def start_conversation(
     
     tutor_message = response.choices[0].message.content
     
-    # Create conversation record in Supabase
+    # Create conversation record in Supabase (without user_id)
     try:
-        result = supabase_admin.table("conversations").insert({
-            "user_id": user_id,
+        result = supabase.table("conversations").insert({
             "topic": request.topic,
             "level": request.level,
             "start_time": datetime.now().isoformat()
@@ -252,10 +229,9 @@ async def start_conversation(
         
         conversation_id = result.data[0]["id"]
         
-        # Save opening message
-        supabase_admin.table("messages").insert({
+        # Save opening message (without user_id)
+        supabase.table("messages").insert({
             "conversation_id": conversation_id,
-            "user_id": user_id,
             "role": "assistant",
             "content": tutor_message
         }).execute()
@@ -278,11 +254,10 @@ async def send_message(
     Send a message in the conversation and get tutor response
     """
     conversation_id = request.conversation_id
-    user_id = user["id"]
     
-    # Load conversation from Supabase
+    # Load conversation from Supabase (without user_id filter)
     try:
-        conv_result = supabase.table("conversations").select("*").eq("id", conversation_id).eq("user_id", user_id).execute()
+        conv_result = supabase.table("conversations").select("*").eq("id", conversation_id).execute()
         
         if not conv_result.data:
             raise HTTPException(status_code=404, detail="Conversation not found")
@@ -306,11 +281,10 @@ async def send_message(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load conversation: {str(e)}")
     
-    # Save user message to Supabase
+    # Save user message to Supabase (without user_id)
     try:
         supabase.table("messages").insert({
             "conversation_id": conversation_id,
-            "user_id": user_id,
             "role": "user",
             "content": request.message
         }).execute()
@@ -342,11 +316,10 @@ async def send_message(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get AI response: {str(e)}")
     
-    # Save assistant message to Supabase
+    # Save assistant message to Supabase (without user_id)
     try:
         supabase.table("messages").insert({
             "conversation_id": conversation_id,
-            "user_id": user_id,
             "role": "assistant",
             "content": tutor_message
         }).execute()
@@ -472,7 +445,6 @@ async def save_progress(
 ):
     """Save conversation progress to Supabase"""
     session_id = request.get("session_id")
-    user_id = user["id"]
     topic = request.get("topic")
     level = request.get("level")
     total_words = request.get("total_words", 0)
@@ -480,19 +452,13 @@ async def save_progress(
     messages = request.get("messages", [])
     
     try:
-        # Update conversation record
+        # Update conversation record (without user_id filter)
         supabase.table("conversations").update({
             "end_time": datetime.now().isoformat(),
             "total_words": total_words,
             "avg_accuracy": avg_accuracy,
             "messages_count": len(messages)
-        }).eq("session_id", session_id).eq("user_id", user_id).execute()
-        
-        # Update user profile stats
-        supabase.table("profiles").update({
-            "total_sessions": supabase.rpc("increment", {"row_id": user_id, "column": "total_sessions"}),
-            "total_words": supabase.rpc("increment", {"row_id": user_id, "column": "total_words", "amount": total_words})
-        }).eq("id", user_id).execute()
+        }).eq("session_id", session_id).execute()
         
         return {"status": "saved", "session_id": session_id}
     
@@ -502,14 +468,12 @@ async def save_progress(
 
 @app.get("/api/progress/stats")
 async def get_progress_stats(user: dict = Depends(get_current_user)):
-    """Get overall progress statistics for current user"""
-    user_id = user["id"]
-    
+    """Get overall progress statistics"""
     try:
-        # Get user's conversation stats
+        # Get all conversations (no user filtering)
         result = supabase.table("conversations").select(
             "total_words", "avg_accuracy", "messages_count"
-        ).eq("user_id", user_id).execute()
+        ).execute()
         
         conversations = result.data or []
         
@@ -521,7 +485,7 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
         # Get recent conversations
         recent_result = supabase.table("conversations").select(
             "session_id", "topic", "level", "start_time", "total_words", "avg_accuracy"
-        ).eq("user_id", user_id).order("start_time", desc=True).limit(10).execute()
+        ).order("start_time", desc=True).limit(10).execute()
         
         return {
             "total_conversations": total_conversations,
@@ -537,13 +501,11 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
 
 @app.get("/api/progress/history")
 async def get_conversation_history(user: dict = Depends(get_current_user)):
-    """Get all conversation history for current user"""
-    user_id = user["id"]
-    
+    """Get all conversation history"""
     try:
         result = supabase.table("conversations").select(
             "session_id", "topic", "level", "start_time", "total_words", "avg_accuracy", "messages_count"
-        ).eq("user_id", user_id).order("start_time", desc=True).execute()
+        ).order("start_time", desc=True).execute()
         
         return {
             "conversations": result.data or []
@@ -564,7 +526,16 @@ async def get_profile(user: dict = Depends(get_current_user)):
         if result.data:
             return result.data[0]
         else:
-            raise HTTPException(status_code=404, detail="Profile not found")
+            # Return a default profile if none exists
+            return {
+                "id": user_id,
+                "email": user["email"],
+                "display_name": user["email"].split("@")[0],
+                "level": "intermediate",
+                "total_sessions": 0,
+                "total_words": 0,
+                "total_minutes": 0
+            }
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get profile: {str(e)}")
