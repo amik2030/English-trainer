@@ -5,7 +5,7 @@ sys.path.insert(0, 'backend')
 try:
     from supabase import create_client
     
-    SUPABASE_URL = "https://qiablkjhbpybhqcshjo.supabase.co"
+    SUPABASE_URL = "https://qiapbljkhbpybhqcshjo.supabase.co"
     SUPABASE_KEY = "***"
     
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
