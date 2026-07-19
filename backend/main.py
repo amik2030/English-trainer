@@ -90,12 +90,11 @@ async def get_current_user(authorization: str = Header(None)) -> dict:
         user_id = user.user.id
         user_email = user.user.email
         
-        # Auto-create profile if it doesn't exist (profiles table might not exist)
+        # Auto-create profile if it doesn't exist
         try:
-            profile_check = supabase.table("profiles").select("id").eq("id", user_id).execute()
+            profile_check = supabase_admin.table("profiles").select("id").eq("id", user_id).execute()
             if not profile_check.data:
-                # Profile doesn't exist, create it
-                supabase.table("profiles").insert({
+                supabase_admin.table("profiles").insert({
                     "id": user_id,
                     "email": user_email,
                     "display_name": user_email.split("@")[0],
@@ -105,7 +104,6 @@ async def get_current_user(authorization: str = Header(None)) -> dict:
                     "total_minutes": 0
                 }).execute()
         except Exception:
-            # Profiles table doesn't exist or other error - continue without profile
             pass
         
         return {
