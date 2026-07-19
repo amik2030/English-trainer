@@ -72,6 +72,7 @@ async def get_current_user(authorization: str = Header(None)) -> dict:
     """
     Extract and verify user from JWT token in Authorization header
     Returns user dict with id, email
+    Auto-creates profile if it doesn't exist
     """
     if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header required")
@@ -86,9 +87,30 @@ async def get_current_user(authorization: str = Header(None)) -> dict:
     try:
         # Verify JWT token with Supabase
         user = supabase_admin.auth.get_user(token)
+        user_id = user.user.id
+        user_email = user.user.email
+        
+        # Auto-create profile if it doesn't exist (profiles table might not exist)
+        try:
+            profile_check = supabase.table("profiles").select("id").eq("id", user_id).execute()
+            if not profile_check.data:
+                # Profile doesn't exist, create it
+                supabase.table("profiles").insert({
+                    "id": user_id,
+                    "email": user_email,
+                    "display_name": user_email.split("@")[0],
+                    "level": "intermediate",
+                    "total_sessions": 0,
+                    "total_words": 0,
+                    "total_minutes": 0
+                }).execute()
+        except Exception:
+            # Profiles table doesn't exist or other error - continue without profile
+            pass
+        
         return {
-            "id": user.user.id,
-            "email": user.user.email
+            "id": user_id,
+            "email": user_email
         }
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
