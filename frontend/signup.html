@@ -241,11 +241,11 @@
                     }, 1000);
                 } else if (data.user) {
                     // User created but email confirmation might be required
-                    successDiv.textContent = 'Account created! Redirecting to login...';
+                    successDiv.textContent = 'Account created! Please check your email to confirm your account, then login.';
                     successDiv.style.display = 'block';
                     setTimeout(() => {
                         window.location.href = 'login.html';
-                    }, 2000);
+                    }, 3000);
                 } else {
                     errorDiv.textContent = 'Unexpected response. Please try again.';
                     errorDiv.style.display = 'block';
