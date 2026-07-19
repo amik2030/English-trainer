@@ -243,7 +243,7 @@ async def start_conversation(
     
     # Create conversation record in Supabase
     try:
-        result = supabase.table("conversations").insert({
+        result = supabase_admin.table("conversations").insert({
             "user_id": user_id,
             "topic": request.topic,
             "level": request.level,
@@ -253,7 +253,7 @@ async def start_conversation(
         conversation_id = result.data[0]["id"]
         
         # Save opening message
-        supabase.table("messages").insert({
+        supabase_admin.table("messages").insert({
             "conversation_id": conversation_id,
             "user_id": user_id,
             "role": "assistant",
