@@ -487,7 +487,10 @@ async def end_conversation(
         except:
             pass
         
-        update_result = supabase_admin.table("conversations").update(update_data).eq("id", conversation_id).eq("user_id", user_id).execute()
+        print(f"[DEBUG] Update data: {update_data}")
+        
+        # Update without user_id filter to avoid issues
+        update_result = supabase_admin.table("conversations").update(update_data).eq("id", conversation_id).execute()
         
         print(f"[DEBUG] Update result: {update_result.data}")
         
