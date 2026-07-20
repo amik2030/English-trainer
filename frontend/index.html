@@ -151,26 +151,39 @@
                 <h2>Transform Your English in Just 30 Days</h2>
                 <p class="challenge-intro">Commit to 15 minutes of daily practice and watch your confidence soar. Our structured 30-day program guides you through progressively challenging conversations.</p>
                 
-                <div class="challenge-timeline">
-                    <div class="timeline-item">
-                        <div class="timeline-week">Week 1</div>
-                        <div class="timeline-title">Build Foundation</div>
-                        <div class="timeline-desc">Master everyday greetings, introductions, and simple conversations</div>
+                <div class="timeline-horizontal">
+                    <div class="timeline-line"></div>
+                    <div class="timeline-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <div class="step-week">Week 1</div>
+                            <h4>Foundation</h4>
+                            <p>Daily greetings & simple conversations</p>
+                        </div>
                     </div>
-                    <div class="timeline-item">
-                        <div class="timeline-week">Week 2</div>
-                        <div class="timeline-title">Expand Vocabulary</div>
-                        <div class="timeline-desc">Learn to express opinions, describe experiences, and ask questions</div>
+                    <div class="timeline-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <div class="step-week">Week 2</div>
+                            <h4>Vocabulary</h4>
+                            <p>Express opinions & ask questions</p>
+                        </div>
                     </div>
-                    <div class="timeline-item">
-                        <div class="timeline-week">Week 3</div>
-                        <div class="timeline-title">Real Scenarios</div>
-                        <div class="timeline-desc">Practice job interviews, travel situations, and professional settings</div>
+                    <div class="timeline-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <div class="step-week">Week 3</div>
+                            <h4>Real Scenarios</h4>
+                            <p>Interviews & professional settings</p>
+                        </div>
                     </div>
-                    <div class="timeline-item">
-                        <div class="timeline-week">Week 4</div>
-                        <div class="timeline-title">Fluency Push</div>
-                        <div class="timeline-desc">Engage in complex discussions, debates, and spontaneous conversations</div>
+                    <div class="timeline-step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <div class="step-week">Week 4</div>
+                            <h4>Fluency</h4>
+                            <p>Complex discussions & debates</p>
+                        </div>
                     </div>
                 </div>
 
@@ -241,50 +254,78 @@
             line-height: 1.6;
         }
 
-        .challenge-timeline {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 3rem;
+        .timeline-horizontal {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin: 4rem 0;
+            padding: 0 2rem;
         }
 
-        .timeline-item {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            transition: transform 0.3s;
+        .timeline-line {
+            position: absolute;
+            top: 30px;
+            left: 10%;
+            right: 10%;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            z-index: 0;
+        }
+
+        .timeline-step {
+            position: relative;
+            z-index: 1;
+            flex: 1;
             text-align: center;
+            max-width: 200px;
         }
 
-        .timeline-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
+        .step-number {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1.5rem;
+            background: white;
+            border: 3px solid #667eea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+            transition: all 0.3s;
         }
 
-        .timeline-week {
-            display: inline-block;
-            padding: 0.4rem 1.2rem;
+        .timeline-step:hover .step-number {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
+            transform: scale(1.1);
         }
 
-        .timeline-title {
+        .step-content h4 {
             font-size: 1.1rem;
             font-weight: 600;
             color: #333;
-            margin-bottom: 0.75rem;
-            line-height: 1.3;
+            margin: 0 0 0.5rem 0;
         }
 
-        .timeline-desc {
-            color: #666;
+        .step-week {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #667eea;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-content p {
             font-size: 0.9rem;
+            color: #666;
             line-height: 1.5;
+            margin: 0;
         }
 
         .challenge-stats {
@@ -342,9 +383,20 @@
             font-size: 0.9rem;
         }
 
-        @media (max-width: 1024px) {
-            .challenge-timeline {
-                grid-template-columns: repeat(2, 1fr);
+        @media (max-width: 900px) {
+            .timeline-horizontal {
+                flex-direction: column;
+                align-items: center;
+                gap: 2rem;
+                padding: 0;
+            }
+
+            .timeline-line {
+                display: none;
+            }
+
+            .timeline-step {
+                max-width: 100%;
             }
         }
 
@@ -355,10 +407,6 @@
 
             .challenge-intro {
                 font-size: 1.1rem;
-            }
-
-            .challenge-timeline {
-                grid-template-columns: 1fr;
             }
 
             .challenge-stats {
