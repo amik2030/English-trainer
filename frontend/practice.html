@@ -859,10 +859,13 @@
                 });
                 if (response.ok) {
                     const data = await response.json();
-                    document.getElementById('totalSessions').textContent = data.total_sessions || 0;
+                    console.log('Progress stats from API:', data);
+                    document.getElementById('totalSessions').textContent = data.total_sessions || data.total_conversations || 0;
                     document.getElementById('totalWords').textContent = data.total_words || 0;
                     document.getElementById('avgAccuracy').textContent = (data.avg_accuracy || 0) + '%';
-                    document.getElementById('totalTime').textContent = Math.round((data.total_time || 0) / 60) + 'm';
+                    document.getElementById('totalTime').textContent = Math.round((data.total_time || data.total_minutes * 60 || 0) / 60) + 'm';
+                } else {
+                    console.error('Failed to load progress stats:', response.status);
                 }
             } catch (error) {
                 console.error('Failed to load progress:', error);
@@ -887,7 +890,10 @@
 
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('Conversation history from API:', data);
                     displayConversationHistory(data.conversations || []);
+                } else {
+                    console.error('Failed to load conversation history:', response.status);
                 }
             } catch (error) {
                 console.error('Failed to load conversation history:', error);

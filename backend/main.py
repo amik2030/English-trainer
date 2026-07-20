@@ -458,19 +458,31 @@ async def end_conversation(
     total_turns = request.get("total_turns", 0)
     duration_seconds = request.get("duration_seconds", 0)
     
+    print(f"[DEBUG] Ending conversation: id={conversation_id}, words={total_words}, turns={total_turns}, duration={duration_seconds}")
+    
     if not conversation_id:
         raise HTTPException(status_code=400, detail="conversation_id is required")
     
     try:
         user_id = user.get("id") or user.get("sub")
+        print(f"[DEBUG] User ID: {user_id}")
+        
+        # First, check if the conversation exists
+        check_result = supabase_admin.table("conversations").select("id", "user_id", "total_words", "messages_count").eq("id", conversation_id).execute()
+        print(f"[DEBUG] Conversation exists: {check_result.data}")
+        
+        if not check_result.data:
+            raise HTTPException(status_code=404, detail="Conversation not found")
         
         # Update conversation record with end stats
-        supabase_admin.table("conversations").update({
+        update_result = supabase_admin.table("conversations").update({
             "end_time": datetime.now().isoformat(),
             "total_words": total_words,
             "messages_count": total_turns,
             "duration_seconds": duration_seconds
         }).eq("id", conversation_id).eq("user_id", user_id).execute()
+        
+        print(f"[DEBUG] Update result: {update_result.data}")
         
         return {
             "status": "saved",
@@ -480,7 +492,10 @@ async def end_conversation(
             "duration_seconds": duration_seconds
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[ERROR] Failed to end conversation: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to end conversation: {str(e)}")
 
 
