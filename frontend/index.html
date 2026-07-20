@@ -6,77 +6,6 @@
     <meta name="description" content="SpeakEasy AI - Master English conversation with AI-powered practice">
     <title>SpeakEasy AI - English Voice & Accent Trainer</title>
     <link rel="stylesheet" href="styles.css">
-    <style>
-        .hero {
-            min-height: 80vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem;
-        }
-        .hero-content h1 {
-            font-size: 3.5rem;
-            margin-bottom: 1rem;
-            font-weight: 700;
-        }
-        .hero-content p {
-            font-size: 1.3rem;
-            margin-bottom: 2rem;
-            opacity: 0.95;
-        }
-        .cta-button {
-            display: inline-block;
-            padding: 1rem 2.5rem;
-            background: white;
-            color: #667eea;
-            text-decoration: none;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 1.1rem;
-            transition: transform 0.2s;
-        }
-        .cta-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        .features {
-            padding: 4rem 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .features h2 {
-            text-align: center;
-            font-size: 2.5rem;
-            margin-bottom: 3rem;
-            color: #333;
-        }
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-        }
-        .feature-card {
-            padding: 2rem;
-            border-radius: 15px;
-            background: #f8f9ff;
-            text-align: center;
-        }
-        .feature-card .icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-        .feature-card h3 {
-            margin-bottom: 0.5rem;
-            color: #333;
-        }
-        .feature-card p {
-            color: #666;
-            line-height: 1.6;
-        }
-    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -99,7 +28,7 @@
         </div>
     </nav>
 
-    <section class="hero">
+    <section class="hero-simple">
         <div class="hero-content">
             <h1>Speak English with Confidence</h1>
             <p>Practice conversation with AI. Get real-time feedback on pronunciation and fluency.</p>
@@ -214,211 +143,6 @@
         </div>
     </section>
 
-    <style>
-        .challenge-section {
-            padding: 5rem 2rem;
-            background: linear-gradient(135deg, #f8f9ff 0%, #e9ecef 100%);
-        }
-
-        .challenge-container {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        .challenge-content {
-            text-align: center;
-        }
-
-        .challenge-badge {
-            display: inline-block;
-            padding: 0.5rem 1.5rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .challenge-content h2 {
-            font-size: 2.5rem;
-            color: #333;
-            margin-bottom: 1rem;
-        }
-
-        .challenge-intro {
-            font-size: 1.2rem;
-            color: #666;
-            max-width: 700px;
-            margin: 0 auto 3rem;
-            line-height: 1.6;
-        }
-
-        .timeline-horizontal {
-            position: relative;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin: 4rem 0;
-            padding: 0 2rem;
-        }
-
-        .timeline-line {
-            position: absolute;
-            top: 30px;
-            left: 10%;
-            right: 10%;
-            height: 3px;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            z-index: 0;
-        }
-
-        .timeline-step {
-            position: relative;
-            z-index: 1;
-            flex: 1;
-            text-align: center;
-            max-width: 200px;
-        }
-
-        .step-number {
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 1.5rem;
-            background: white;
-            border: 3px solid #667eea;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #667eea;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-            transition: all 0.3s;
-        }
-
-        .timeline-step:hover .step-number {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            transform: scale(1.1);
-        }
-
-        .step-content h4 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #333;
-            margin: 0 0 0.5rem 0;
-        }
-
-        .step-week {
-            display: inline-block;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #667eea;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 0.5rem;
-        }
-
-        .step-content p {
-            font-size: 0.9rem;
-            color: #666;
-            line-height: 1.5;
-            margin: 0;
-        }
-
-        .challenge-stats {
-            display: flex;
-            justify-content: center;
-            gap: 3rem;
-            margin: 3rem 0;
-            flex-wrap: wrap;
-        }
-
-        .challenge-stats .stat-item {
-            text-align: center;
-        }
-
-        .challenge-stats .stat-number {
-            font-size: 3rem;
-            font-weight: 700;
-            color: #667eea;
-            line-height: 1;
-        }
-
-        .challenge-stats .stat-label {
-            font-size: 1rem;
-            color: #666;
-            margin-top: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .challenge-cta {
-            margin-top: 2rem;
-        }
-
-        .challenge-cta .cta-button {
-            display: inline-block;
-            padding: 1rem 3rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 1.2rem;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-        }
-
-        .challenge-cta .cta-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        .cta-note {
-            margin-top: 1rem;
-            color: #999;
-            font-size: 0.9rem;
-        }
-
-        @media (max-width: 900px) {
-            .timeline-horizontal {
-                flex-direction: column;
-                align-items: center;
-                gap: 2rem;
-                padding: 0;
-            }
-
-            .timeline-line {
-                display: none;
-            }
-
-            .timeline-step {
-                max-width: 100%;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .challenge-content h2 {
-                font-size: 2rem;
-            }
-
-            .challenge-intro {
-                font-size: 1.1rem;
-            }
-
-            .challenge-stats {
-                gap: 2rem;
-            }
-
-            .challenge-stats .stat-number {
-                font-size: 2.5rem;
-            }
-        }
-    </style>
-
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
@@ -435,68 +159,15 @@
             </div>
             <div class="footer-links">
                 <h3>Research</h3>
-                <a href="about.html">Methodology</a>
-                <a href="about.html">Studies</a>
-                <a href="about.html">References</a>
+                <a href="about.html#methodology">Methodology</a>
+                <a href="about.html#studies">Studies</a>
+                <a href="about.html#references">References</a>
             </div>
         </div>
         <div class="footer-bottom">
             <p>&copy; 2026 SpeakEasy AI. All rights reserved.</p>
         </div>
     </footer>
-
-    <style>
-        .footer {
-            background: #1a1a2e;
-            color: white;
-            padding: 3rem 2rem 1rem;
-            margin-top: 4rem;
-        }
-        .footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 3rem;
-            margin-bottom: 2rem;
-        }
-        .footer-brand h3 {
-            font-size: 1.3rem;
-            margin-bottom: 0.8rem;
-            font-weight: 600;
-        }
-        .footer-brand p {
-            color: #a0a0b0;
-            line-height: 1.6;
-            font-size: 0.95rem;
-        }
-        .footer-links h3 {
-            font-size: 1.1rem;
-            margin-bottom: 1rem;
-            font-weight: 600;
-        }
-        .footer-links {
-            display: flex;
-            flex-direction: column;
-            gap: 0.7rem;
-        }
-        .footer-links a {
-            color: #a0a0b0;
-            text-decoration: none;
-            transition: color 0.2s;
-            font-size: 0.95rem;
-        }
-        .footer-links a:hover {
-            color: #667eea;
-        }
-        .footer-bottom {
-            text-align: center;
-            padding-top: 1.5rem;
-            border-top: 1px solid #2a2a3e;
-            color: #666;
-            font-size: 0.9rem;
-        }
-    </style>
 
     <script src="main.js"></script>
 </body>
