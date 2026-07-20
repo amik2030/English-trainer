@@ -336,7 +336,7 @@ async def send_message(
 async def text_to_speech(request: dict):
     """
     Convert text to speech using OpenAI TTS
-    Returns audio file path
+    Returns audio filename that can be accessed via /api/audio/{filename}
     """
     text = request.get("text", "")
     voice = request.get("voice", "alloy")
@@ -355,9 +355,9 @@ async def text_to_speech(request: dict):
         # Save to temp file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
             response.stream_to_file(temp_file.name)
-            temp_path = temp_file.name
+            filename = os.path.basename(temp_file.name)
         
-        return {"audio_path": temp_path}
+        return {"filename": filename}
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TTS failed: {str(e)}")
