@@ -231,8 +231,9 @@ async def start_conversation(
         
         conversation_id = result.data[0]["id"]
         
-        # Save opening message (without user_id)
+        # Save opening message with user_id
         supabase_admin.table("messages").insert({
+            "user_id": user_id,
             "conversation_id": conversation_id,
             "role": "assistant",
             "content": tutor_message
