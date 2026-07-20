@@ -316,7 +316,9 @@ async def send_message(
     
     # Save user message to Supabase with grammar error count
     try:
+        user_id = user.get("id") or user.get("sub")
         supabase_admin.table("messages").insert({
+            "user_id": user_id,
             "conversation_id": conversation_id,
             "role": "user",
             "content": request.message,
@@ -325,7 +327,9 @@ async def send_message(
     except Exception as e:
         # If grammar_errors column doesn't exist, save without it
         try:
+            user_id = user.get("id") or user.get("sub")
             supabase_admin.table("messages").insert({
+                "user_id": user_id,
                 "conversation_id": conversation_id,
                 "role": "user",
                 "content": request.message
@@ -360,7 +364,9 @@ async def send_message(
     
     # Save assistant message to Supabase
     try:
+        user_id = user.get("id") or user.get("sub")
         supabase_admin.table("messages").insert({
+            "user_id": user_id,
             "conversation_id": conversation_id,
             "role": "assistant",
             "content": tutor_message
