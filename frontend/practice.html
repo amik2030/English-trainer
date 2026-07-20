@@ -557,6 +557,9 @@
                     startTimer();
                     
                     // Show end conversation button
+                    document.getElementById('endConversationBtn').style.display = 'inline-block';
+                    
+                    // Show end conversation button
                     document.getElementById("endConversationBtn").style.display = "inline-block";
                 }
             } catch (error) {
@@ -634,6 +637,24 @@
         // Auto-start conversation on page load
         startNewConversation();
 
+        // End conversation handler
+        document.getElementById('endConversationBtn').addEventListener('click', function() {
+            if (isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('recording');
+            }
+            conversationId = null;
+            messagesContainer.innerHTML = '<div class="message ai"><div class="message-avatar"></div><div class="message-content"><p class="message-text">Session ended. Select a topic above to start a new conversation.</p></div></div>';
+            document.getElementById('endConversationBtn').style.display = 'none';
+            statusText.textContent = 'Select a topic to begin';
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('sessionTime').textContent = '0:00';
+            wordCount = 0;
+            turnCount = 0;
+            updateStats();
+        });
+
         // Logout handler
         document.getElementById('logoutLink').addEventListener('click', function(e) {
             e.preventDefault();
@@ -641,7 +662,7 @@
             window.location.href = 'login.html';
         });
 
-        // Initialize
+        // Auto-start conversation on page load
         startNewConversation();
     </script>
 </body>
