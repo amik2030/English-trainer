@@ -822,7 +822,7 @@
             }
             
             conversationId = null;
-            messagesContainer.innerHTML = '<div class="message ai"><div class="message-avatar">🤖</div><div class="message-content"><p class="message-text">Session ended. Select a topic above and click "Start Conversation" to begin again.</p></div></div>';
+            messagesContainer.innerHTML = '<div class="message ai"><div class="message-avatar"></div><div class="message-content"><p class="message-text">Session ended. Select a topic above and click "Start Conversation" to begin again.</p></div></div>';
             recordBtn.style.display = 'none';
             endConversationBtn.style.display = 'none';
             document.getElementById('startConversationBtn').style.display = 'inline-block';
@@ -832,6 +832,10 @@
             wordCount = 0;
             turnCount = 0;
             updateStats();
+            
+            // Refresh progress stats and conversation history
+            loadProgress();
+            loadConversationHistory();
         });
 
         // Logout handler
