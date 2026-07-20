@@ -7,21 +7,31 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         .practice-container {
-            max-width: 1200px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 1.5rem;
         }
 
         .practice-header {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .practice-header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            color: #333;
         }
 
         .stats-bar {
             display: flex;
             justify-content: center;
-            gap: 2rem;
+            gap: 2.5rem;
             margin-top: 1rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
         .stat-item {
@@ -31,44 +41,53 @@
         }
 
         .stat-label {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .stat-value {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: bold;
-            color: #333;
+            color: #667eea;
         }
 
         .topic-selector {
             background: white;
             padding: 1.5rem;
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem;
+        }
+
+        .topic-selector h3 {
+            margin: 0 0 1rem 0;
+            font-size: 1.2rem;
+            color: #333;
         }
 
         .topic-buttons {
             display: flex;
             flex-wrap: wrap;
-            gap: 1rem;
+            gap: 0.75rem;
             margin-top: 1rem;
         }
 
         .topic-btn {
-            padding: 0.75rem 1.5rem;
+            padding: 0.6rem 1.2rem;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             background: white;
             cursor: pointer;
-            transition: all 0.3s;
-            font-size: 1rem;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+            font-weight: 500;
         }
 
         .topic-btn:hover {
             border-color: #667eea;
-            background: #f5f5f5;
+            background: #f8f9ff;
         }
 
         .topic-btn.active {
@@ -80,23 +99,30 @@
         .conversation-area {
             background: white;
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.5rem;
         }
 
         .messages {
-            max-height: 500px;
+            max-height: 400px;
             overflow-y: auto;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             padding: 1rem;
-            border: 1px solid #e0e0e0;
+            background: #f8f9fa;
             border-radius: 8px;
+            min-height: 200px;
         }
 
         .message {
             display: flex;
             margin-bottom: 1rem;
-            gap: 1rem;
+            gap: 0.75rem;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .message.user {
@@ -104,25 +130,27 @@
         }
 
         .message-avatar {
-            font-size: 2rem;
+            font-size: 1.8rem;
             flex-shrink: 0;
         }
 
         .message-content {
-            background: #f5f5f5;
-            padding: 1rem;
-            border-radius: 8px;
+            background: white;
+            padding: 0.9rem 1.2rem;
+            border-radius: 12px;
             max-width: 70%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
 
         .message.user .message-content {
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
 
         .message-text {
             margin: 0;
             line-height: 1.5;
+            font-size: 0.95rem;
         }
 
         .voice-controls {
@@ -133,6 +161,7 @@
         .status-text {
             margin-bottom: 1rem;
             color: #666;
+            font-size: 0.95rem;
         }
 
         .control-buttons {
@@ -143,47 +172,50 @@
         }
 
         .record-btn {
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             border: none;
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             cursor: pointer;
             transition: all 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
 
         .record-btn:hover {
-            background: #5568d3;
             transform: scale(1.05);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
         }
 
         .record-btn.recording {
-            background: #ff4444;
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
             animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
+            50% { transform: scale(1.08); }
         }
 
         .end-btn {
-            padding: 0.75rem 1.5rem;
+            padding: 0.7rem 1.5rem;
             background: #ff4444;
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
         }
 
         .end-btn:hover {
             background: #cc0000;
+            transform: translateY(-1px);
         }
 
         .error-message {
@@ -192,61 +224,80 @@
             padding: 1rem;
             border-radius: 8px;
             margin: 1rem 0;
+            border-left: 4px solid #d32f2f;
         }
 
         .progress-dashboard {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 2.5rem;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
-            margin: 2rem 0;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.25);
+            margin-bottom: 1.5rem;
             color: white;
         }
 
         .progress-dashboard h3 {
-            margin: 0 0 2rem 0;
-            font-size: 1.8rem;
+            margin: 0 0 1.5rem 0;
+            font-size: 1.5rem;
             text-align: center;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .progress-stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1.5rem;
         }
 
         .stat-card {
             text-align: center;
-            padding: 2rem 1.5rem;
+            padding: 1.5rem 1rem;
             background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            transition: transform 0.3s ease;
+            border-radius: 10px;
+            transition: transform 0.2s ease;
             color: #333;
         }
 
         .stat-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 1);
+            transform: translateY(-3px);
         }
 
         .stat-value {
-            font-size: 3rem;
+            font-size: 2.2rem;
             font-weight: bold;
             display: block;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.4rem;
             color: #667eea;
-            text-shadow: none;
         }
 
         .stat-label {
-            font-size: 1rem;
+            font-size: 0.85rem;
             color: #555;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        @media (max-width: 768px) {
+            .practice-container {
+                padding: 1rem;
+            }
+
+            .stats-bar {
+                gap: 1.5rem;
+            }
+
+            .topic-buttons {
+                gap: 0.5rem;
+            }
+
+            .topic-btn {
+                padding: 0.5rem 1rem;
+                font-size: 0.9rem;
+            }
+
+            .message-content {
+                max-width: 80%;
+            }
         }
     </style>
 </head>
@@ -634,10 +685,37 @@
         }
 
         // End conversation handler
-        endConversationBtn.addEventListener('click', function() {
+        endConversationBtn.addEventListener('click', async function() {
             if (isRecording) {
                 stopRecording();
             }
+            
+            // Save conversation stats before ending
+            if (conversationId) {
+                try {
+                    const authToken = await getAuthToken();
+                    if (authToken) {
+                        const duration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
+                        
+                        await fetch('/api/conversation/end', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${authToken}`
+                            },
+                            body: JSON.stringify({
+                                conversation_id: conversationId,
+                                total_words: wordCount,
+                                total_turns: turnCount,
+                                duration_seconds: duration
+                            })
+                        });
+                    }
+                } catch (error) {
+                    console.error('Failed to save conversation stats:', error);
+                }
+            }
+            
             conversationId = null;
             messagesContainer.innerHTML = '<div class="message ai"><div class="message-avatar">🤖</div><div class="message-content"><p class="message-text">Session ended. Select a topic above and click "Start Conversation" to begin again.</p></div></div>';
             recordBtn.style.display = 'none';

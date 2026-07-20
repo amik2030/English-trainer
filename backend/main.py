@@ -445,6 +445,45 @@ async def analyze_pronunciation(
     }
 
 
+@app.post("/api/conversation/end")
+async def end_conversation(
+    request: dict,
+    user: dict = Depends(get_current_user)
+):
+    """
+    End a conversation and save stats
+    """
+    conversation_id = request.get("conversation_id")
+    total_words = request.get("total_words", 0)
+    total_turns = request.get("total_turns", 0)
+    duration_seconds = request.get("duration_seconds", 0)
+    
+    if not conversation_id:
+        raise HTTPException(status_code=400, detail="conversation_id is required")
+    
+    try:
+        user_id = user.get("id") or user.get("sub")
+        
+        # Update conversation record with end stats
+        supabase_admin.table("conversations").update({
+            "end_time": datetime.now().isoformat(),
+            "total_words": total_words,
+            "messages_count": total_turns,
+            "duration_seconds": duration_seconds
+        }).eq("id", conversation_id).eq("user_id", user_id).execute()
+        
+        return {
+            "status": "saved",
+            "conversation_id": conversation_id,
+            "total_words": total_words,
+            "total_turns": total_turns,
+            "duration_seconds": duration_seconds
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to end conversation: {str(e)}")
+
+
 @app.post("/api/progress/save")
 async def save_progress(
     request: dict,
@@ -477,10 +516,12 @@ async def save_progress(
 async def get_progress_stats(user: dict = Depends(get_current_user)):
     """Get overall progress statistics"""
     try:
-        # Get all conversations (no user filtering)
+        user_id = user.get("id") or user.get("sub")
+        
+        # Get user's conversations
         result = supabase_admin.table("conversations").select(
-            "total_words", "avg_accuracy", "messages_count"
-        ).execute()
+            "total_words", "avg_accuracy", "messages_count", "duration_seconds", "start_time", "end_time"
+        ).eq("user_id", user_id).execute()
         
         conversations = result.data or []
         
@@ -488,17 +529,21 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
         total_words = sum(c.get("total_words", 0) for c in conversations)
         avg_accuracy = sum(c.get("avg_accuracy", 0) for c in conversations) / total_conversations if total_conversations > 0 else 0
         total_messages = sum(c.get("messages_count", 0) for c in conversations)
+        total_duration = sum(c.get("duration_seconds", 0) for c in conversations)
         
         # Get recent conversations
         recent_result = supabase_admin.table("conversations").select(
-            "session_id", "topic", "level", "start_time", "total_words", "avg_accuracy"
-        ).order("start_time", desc=True).limit(10).execute()
+            "id", "topic", "level", "start_time", "total_words", "avg_accuracy", "messages_count", "duration_seconds"
+        ).eq("user_id", user_id).order("start_time", desc=True).limit(10).execute()
         
         return {
             "total_conversations": total_conversations,
+            "total_sessions": total_conversations,
             "total_words": total_words,
             "avg_accuracy": round(avg_accuracy, 1),
             "total_messages": total_messages,
+            "total_time": total_duration,
+            "total_minutes": total_duration / 60,
             "recent_conversations": recent_result.data or []
         }
     
