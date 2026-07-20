@@ -467,13 +467,6 @@ async def end_conversation(
         user_id = user.get("id") or user.get("sub")
         print(f"[DEBUG] User ID: {user_id}")
         
-        # First, check if the conversation exists
-        check_result = supabase_admin.table("conversations").select("id", "user_id", "total_words", "messages_count").eq("id", conversation_id).execute()
-        print(f"[DEBUG] Conversation exists: {check_result.data}")
-        
-        if not check_result.data:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        
         # Update conversation record with end stats
         update_data = {
             "end_time": datetime.now().isoformat(),
@@ -483,10 +476,14 @@ async def end_conversation(
         
         print(f"[DEBUG] Update data: {update_data}")
         
-        # Update without user_id filter to avoid issues
+        # Update the conversation
         update_result = supabase_admin.table("conversations").update(update_data).eq("id", conversation_id).execute()
         
         print(f"[DEBUG] Update result: {update_result.data}")
+        
+        if not update_result.data:
+            print(f"[ERROR] No data returned from update - conversation might not exist or update failed")
+            raise HTTPException(status_code=404, detail="Conversation not found or update failed")
         
         return {
             "status": "saved",
@@ -500,6 +497,8 @@ async def end_conversation(
         raise
     except Exception as e:
         print(f"[ERROR] Failed to end conversation: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to end conversation: {str(e)}")
 
 
@@ -537,9 +536,9 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
     try:
         user_id = user.get("id") or user.get("sub")
         
-        # Get user's conversations - select only columns that definitely exist
+        # Get user's conversations
         result = supabase_admin.table("conversations").select(
-            "total_words", "avg_accuracy", "messages_count", "start_time", "end_time"
+            "id", "total_words", "avg_accuracy", "messages_count", "start_time", "end_time"
         ).eq("user_id", user_id).execute()
         
         conversations = result.data or []
@@ -549,18 +548,18 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
         avg_accuracy = sum(c.get("avg_accuracy", 0) or 0 for c in conversations) / total_conversations if total_conversations > 0 else 0
         total_messages = sum(c.get("messages_count", 0) or 0 for c in conversations)
         
-        # Try to get duration_seconds if column exists
+        # Calculate total duration from start_time and end_time
         total_duration = 0
-        try:
-            for conv in conversations:
-                total_duration += conv.get("duration_seconds", 0) or 0
-        except:
-            pass
+        for conv in conversations:
+            if conv.get("start_time") and conv.get("end_time"):
+                try:
+                    start = datetime.fromisoformat(conv["start_time"].replace('Z', '+00:00'))
+                    end = datetime.fromisoformat(conv["end_time"].replace('Z', '+00:00'))
+                    total_duration += (end - start).total_seconds()
+                except:
+                    pass
         
-        # Get recent conversations
-        recent_result = supabase_admin.table("conversations").select(
-            "id", "topic", "level", "start_time", "total_words", "avg_accuracy", "messages_count"
-        ).eq("user_id", user_id).order("start_time", desc=True).limit(10).execute()
+        print(f"[DEBUG] Stats for user {user_id}: {total_conversations} conversations, {total_words} words, {total_duration}s duration")
         
         return {
             "total_conversations": total_conversations,
@@ -569,12 +568,13 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
             "avg_accuracy": round(avg_accuracy, 1),
             "total_messages": total_messages,
             "total_time": total_duration,
-            "total_minutes": total_duration / 60,
-            "recent_conversations": recent_result.data or []
+            "total_minutes": total_duration / 60
         }
     
     except Exception as e:
         print(f"[ERROR] Failed to get stats: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
 
