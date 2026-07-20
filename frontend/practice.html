@@ -308,15 +308,20 @@
             </div>
 
             <div class="voice-controls">
-                <p class="status-text" id="statusText">Click to start speaking</p>
-                <button class="record-btn" id="recordBtn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                        <line x1="12" y1="19" x2="12" y2="23"></line>
-                        <line x1="8" y1="23" x2="16" y2="23"></line>
-                    </svg>
-                </button>
+                <p class="status-text" id="statusText">Select a topic to begin</p>
+                <div style="display: flex; gap: 1rem; align-items: center; justify-content: center;">
+                    <button class="record-btn" id="recordBtn" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" y1="19" x2="12" y2="23"></line>
+                            <line x1="8" y1="23" x2="16" y2="23"></line>
+                        </svg>
+                    </button>
+                    <button id="endConversationBtn" style="display: none; padding: 0.8rem 1.5rem; background: #ff4444; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600;">
+                        ✕ End Conversation
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -418,14 +423,15 @@
                 const data = await response.json();
                 
                 // Add user message
-                if (data.transcription) {
-                    addMessage('user', data.transcription);
-                    wordCount += data.transcription.split(' ').length;
+                const transcription = data.text || '';
+                if (transcription) {
+                    addMessage('user', transcription);
+                    wordCount += transcription.split(' ').length;
                     updateStats();
                 }
 
                 // Get AI response
-                if (conversationId && data.transcription) {
+                if (conversationId && transcription) {
                     const convResponse = await fetch('/api/conversation/message', {
                         method: 'POST',
                         headers: {
@@ -434,7 +440,7 @@
                         },
                         body: JSON.stringify({
                             conversation_id: conversationId,
-                            message: data.transcription
+                            message: transcription
                         })
                     });
 
@@ -525,6 +531,11 @@
                     addMessage('ai', data.greeting);
                     await playAudio(data.greeting);
                     
+                    // Show mic and end buttons
+                    document.getElementById('recordBtn').style.display = 'flex';
+                    document.getElementById('endConversationBtn').style.display = 'inline-block';
+                    statusText.textContent = 'Click the mic to start speaking';
+                    
                     // Reset stats
                     wordCount = 0;
                     turnCount = 0;
@@ -546,6 +557,26 @@
             messagesContainer.appendChild(errorDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
+
+        // End conversation handler
+        document.getElementById('endConversationBtn').addEventListener('click', function() {
+            if (isRecording) {
+                stopRecording();
+            }
+            conversationId = null;
+            messagesContainer.innerHTML = '<div class="message ai"><div class="message-avatar"></div><div class="message-content"><p class="message-text">Session ended. Select a topic above to start a new conversation.</p></div></div>';
+            document.getElementById('recordBtn').style.display = 'none';
+            document.getElementById('endConversationBtn').style.display = 'none';
+            statusText.textContent = 'Select a topic to begin';
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('sessionTime').textContent = '0:00';
+            wordCount = 0;
+            turnCount = 0;
+            updateStats();
+        });
+
+        // Auto-start conversation on page load
+        startNewConversation();
 
         // Logout handler
         document.getElementById('logoutLink').addEventListener('click', function(e) {
