@@ -2110,21 +2110,23 @@ section {
 
 .hero-challenge-cta {
     display: inline-block;
-    background: white;
-    color: #667eea;
-    padding: 16px 40px;
-    border-radius: 50px;
+    background: transparent;
+    color: white;
+    padding: 0;
+    border-radius: 0;
     font-size: 1.2rem;
     font-weight: 600;
     text-decoration: none;
     transition: all 0.3s;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: none;
     margin-bottom: 16px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
 }
 
 .hero-challenge-cta:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: none;
+    border-bottom-color: white;
 }
 
 .hero-challenge-note {
