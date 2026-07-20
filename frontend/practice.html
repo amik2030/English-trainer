@@ -401,7 +401,7 @@
         async function processAudio(audioBlob) {
             try {
                 const formData = new FormData();
-                formData.append('audio', audioBlob, 'recording.wav');
+                formData.append('file', audioBlob, 'recording.wav');
 
                 const response = await fetch('/api/transcribe', {
                     method: 'POST',

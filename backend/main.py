@@ -221,7 +221,7 @@ async def start_conversation(
     
     # Create conversation record in Supabase (without user_id)
     try:
-        result = supabase.table("conversations").insert({
+        result = supabase_admin.table("conversations").insert({
             "topic": request.topic,
             "level": request.level,
             "start_time": datetime.now().isoformat()
@@ -230,7 +230,7 @@ async def start_conversation(
         conversation_id = result.data[0]["id"]
         
         # Save opening message (without user_id)
-        supabase.table("messages").insert({
+        supabase_admin.table("messages").insert({
             "conversation_id": conversation_id,
             "role": "assistant",
             "content": tutor_message
@@ -257,7 +257,7 @@ async def send_message(
     
     # Load conversation from Supabase (without user_id filter)
     try:
-        conv_result = supabase.table("conversations").select("*").eq("id", conversation_id).execute()
+        conv_result = supabase_admin.table("conversations").select("*").eq("id", conversation_id).execute()
         
         if not conv_result.data:
             raise HTTPException(status_code=404, detail="Conversation not found")
@@ -283,7 +283,7 @@ async def send_message(
     
     # Save user message to Supabase (without user_id)
     try:
-        supabase.table("messages").insert({
+        supabase_admin.table("messages").insert({
             "conversation_id": conversation_id,
             "role": "user",
             "content": request.message
@@ -293,7 +293,7 @@ async def send_message(
     
     # Load message history from Supabase
     try:
-        messages_result = supabase.table("messages").select("role, content").eq("conversation_id", conversation_id).order("created_at").execute()
+        messages_result = supabase_admin.table("messages").select("role, content").eq("conversation_id", conversation_id).order("created_at").execute()
         
         # Build message history for OpenAI
         messages = [{"role": "system", "content": system_prompt}]
@@ -318,7 +318,7 @@ async def send_message(
     
     # Save assistant message to Supabase (without user_id)
     try:
-        supabase.table("messages").insert({
+        supabase_admin.table("messages").insert({
             "conversation_id": conversation_id,
             "role": "assistant",
             "content": tutor_message
@@ -453,7 +453,7 @@ async def save_progress(
     
     try:
         # Update conversation record (without user_id filter)
-        supabase.table("conversations").update({
+        supabase_admin.table("conversations").update({
             "end_time": datetime.now().isoformat(),
             "total_words": total_words,
             "avg_accuracy": avg_accuracy,
@@ -471,7 +471,7 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
     """Get overall progress statistics"""
     try:
         # Get all conversations (no user filtering)
-        result = supabase.table("conversations").select(
+        result = supabase_admin.table("conversations").select(
             "total_words", "avg_accuracy", "messages_count"
         ).execute()
         
@@ -483,7 +483,7 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
         total_messages = sum(c.get("messages_count", 0) for c in conversations)
         
         # Get recent conversations
-        recent_result = supabase.table("conversations").select(
+        recent_result = supabase_admin.table("conversations").select(
             "session_id", "topic", "level", "start_time", "total_words", "avg_accuracy"
         ).order("start_time", desc=True).limit(10).execute()
         
@@ -503,7 +503,7 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
 async def get_conversation_history(user: dict = Depends(get_current_user)):
     """Get all conversation history"""
     try:
-        result = supabase.table("conversations").select(
+        result = supabase_admin.table("conversations").select(
             "session_id", "topic", "level", "start_time", "total_words", "avg_accuracy", "messages_count"
         ).order("start_time", desc=True).execute()
         
