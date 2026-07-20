@@ -961,7 +961,7 @@ section {
 .practice-container {
     max-width: 900px;
     margin: 0 auto;
-    padding: 1.5rem;
+    padding: 100px 1.5rem 1.5rem;
 }
 
 .practice-header {
