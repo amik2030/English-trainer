@@ -28,15 +28,15 @@ load_dotenv()
 # ============================================
 
 # OpenAI
-OPENAI_API_KEY = ***"OPENAI_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    *** ValueError("OPENAI_API_KEY environment variable is required")
+    raise ValueError("OPENAI_API_KEY environment variable is required")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = ***"SUPABASE_KEY")
-SUPABASE_SERVICE_KEY = ***"SUPABASE_SERVICE_KEY")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 if not all([SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY]):
     raise ValueError("Supabase environment variables are required")
 
