@@ -634,12 +634,37 @@ async def get_progress_stats(user: dict = Depends(get_current_user)):
 async def get_conversation_history(user: dict = Depends(get_current_user)):
     """Get all conversation history"""
     try:
+        user_id = user.get("id") or user.get("sub")
         result = supabase_admin.table("conversations").select(
-            "session_id", "topic", "level", "start_time", "total_words", "avg_accuracy", "messages_count"
-        ).order("start_time", desc=True).execute()
+            "id", "topic", "level", "start_time", "end_time", "total_words", "avg_accuracy", "messages_count"
+        ).eq("user_id", user_id).order("start_time", desc=True).limit(50).execute()
+        
+        # Calculate duration for each conversation
+        conversations = []
+        for conv in result.data or []:
+            duration_seconds = 0
+            if conv.get("start_time") and conv.get("end_time"):
+                try:
+                    start = datetime.fromisoformat(conv["start_time"].replace('Z', '+00:00'))
+                    end = datetime.fromisoformat(conv["end_time"].replace('Z', '+00:00'))
+                    duration_seconds = int((end - start).total_seconds())
+                except:
+                    pass
+            
+            conversations.append({
+                "id": conv.get("id"),
+                "topic": conv.get("topic"),
+                "level": conv.get("level"),
+                "start_time": conv.get("start_time"),
+                "end_time": conv.get("end_time"),
+                "total_words": conv.get("total_words"),
+                "avg_accuracy": conv.get("avg_accuracy"),
+                "messages_count": conv.get("messages_count"),
+                "duration_seconds": duration_seconds
+            })
         
         return {
-            "conversations": result.data or []
+            "conversations": conversations
         }
     
     except Exception as e:

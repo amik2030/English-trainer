@@ -533,14 +533,21 @@
                 return;
             }
 
-            container.innerHTML = conversations.map(conv => {
+            // Show only last 5 by default
+            const initialShow = 5;
+            const toShow = conversations.slice(0, initialShow);
+            const hasMore = conversations.length > initialShow;
+
+            let html = toShow.map(conv => {
                 const date = new Date(conv.start_time).toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit'
                 });
-                const duration = conv.duration_seconds ? Math.round(conv.duration_seconds / 60) : 0;
+                const durationSec = conv.duration_seconds || 0;
+                const duration = durationSec >= 60 ? Math.round(durationSec / 60) + 'm' : durationSec + 's';
+                const accuracy = conv.avg_accuracy ? Math.round(conv.avg_accuracy) + '%' : '-';
                 
                 return `
                     <div class="conversation-item">
@@ -551,7 +558,7 @@
                         <div class="conversation-stats">
                             <div class="conversation-stat">
                                 <span class="stat-icon">💬</span>
-                                <span>${conv.messages_count || 0} messages</span>
+                                <span>${conv.messages_count || 0} msgs</span>
                             </div>
                             <div class="conversation-stat">
                                 <span class="stat-icon">📝</span>
@@ -559,12 +566,84 @@
                             </div>
                             <div class="conversation-stat">
                                 <span class="stat-icon">⏱️</span>
-                                <span>${duration} min</span>
+                                <span>${duration}</span>
+                            </div>
+                            <div class="conversation-stat">
+                                <span class="stat-icon">🎯</span>
+                                <span>${accuracy}</span>
                             </div>
                         </div>
                     </div>
                 `;
             }).join('');
+
+            if (hasMore) {
+                html += `
+                    <button id="showMoreHistoryBtn" style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        background: #f0f0f0;
+                        border: 1px solid #e0e0e0;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 0.9rem;
+                        color: #667eea;
+                        font-weight: 600;
+                        transition: all 0.2s;
+                    ">Show ${conversations.length - initialShow} more conversations</button>
+                `;
+            }
+
+            container.innerHTML = html;
+
+            // Handle show more
+            const showMoreBtn = document.getElementById('showMoreHistoryBtn');
+            if (showMoreBtn) {
+                showMoreBtn.addEventListener('click', () => {
+                    const remaining = conversations.slice(initialShow);
+                    const moreHtml = remaining.map(conv => {
+                        const date = new Date(conv.start_time).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        const durationSec = conv.duration_seconds || 0;
+                        const duration = durationSec >= 60 ? Math.round(durationSec / 60) + 'm' : durationSec + 's';
+                        const accuracy = conv.avg_accuracy ? Math.round(conv.avg_accuracy) + '%' : '-';
+                        
+                        return `
+                            <div class="conversation-item">
+                                <div class="conversation-header">
+                                    <span class="conversation-topic">${conv.topic || 'General'}</span>
+                                    <span class="conversation-date">${date}</span>
+                                </div>
+                                <div class="conversation-stats">
+                                    <div class="conversation-stat">
+                                        <span class="stat-icon">💬</span>
+                                        <span>${conv.messages_count || 0} msgs</span>
+                                    </div>
+                                    <div class="conversation-stat">
+                                        <span class="stat-icon">📝</span>
+                                        <span>${conv.total_words || 0} words</span>
+                                    </div>
+                                    <div class="conversation-stat">
+                                        <span class="stat-icon">⏱️</span>
+                                        <span>${duration}</span>
+                                    </div>
+                                    <div class="conversation-stat">
+                                        <span class="stat-icon">🎯</span>
+                                        <span>${accuracy}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    showMoreBtn.remove();
+                    container.insertAdjacentHTML('beforeend', moreHtml);
+                });
+            }
         }
     </script>
 </body>
