@@ -2439,3 +2439,9 @@ section {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
     background: #f8f9ff;
 }
+
+.hero-cta-note {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9rem;
+    margin-top: 16px;
+}
