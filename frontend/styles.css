@@ -2239,3 +2239,142 @@ section {
         font-size: 2rem;
     }
 }
+
+/* ============================================
+   HOMEPAGE - Features Section (Enhanced)
+   ============================================ */
+.features-section {
+    padding: 100px 20px;
+    background: linear-gradient(135deg, #f8f9ff 0%, #e9ecef 100%);
+}
+
+.features-header {
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto 60px;
+}
+
+.features-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 8px 24px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.features-header h2 {
+    font-size: 3rem;
+    color: #333;
+    margin-bottom: 20px;
+    font-weight: 700;
+}
+
+.features-intro {
+    font-size: 1.3rem;
+    color: #666;
+    line-height: 1.6;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.feature-card {
+    background: white;
+    padding: 40px 30px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s;
+    border: 2px solid transparent;
+}
+
+.feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 12px 40px rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+}
+
+.feature-icon-wrapper {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 25px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.feature-card:hover .feature-icon-wrapper {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transform: scale(1.1) rotate(5deg);
+}
+
+.feature-icon-wrapper .icon {
+    font-size: 3rem;
+    transition: all 0.3s;
+}
+
+.feature-card:hover .feature-icon-wrapper .icon {
+    transform: scale(1.2);
+}
+
+.feature-card h3 {
+    font-size: 1.5rem;
+    color: #333;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.feature-card p {
+    color: #666;
+    line-height: 1.7;
+    font-size: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .features-section {
+        padding: 60px 20px;
+    }
+    
+    .features-header h2 {
+        font-size: 2rem;
+    }
+    
+    .features-intro {
+        font-size: 1.1rem;
+    }
+    
+    .feature-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .feature-card {
+        padding: 30px 20px;
+    }
+    
+    .feature-icon-wrapper {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .feature-icon-wrapper .icon {
+        font-size: 2.5rem;
+    }
+    
+    .feature-card h3 {
+        font-size: 1.3rem;
+    }
+}
