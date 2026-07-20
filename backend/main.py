@@ -284,9 +284,11 @@ async def send_message(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load conversation: {str(e)}")
     
-    # Save user message to Supabase (without user_id)
+    # Save user message to Supabase
     try:
+        user_id = user.get("id") or user.get("sub")
         supabase_admin.table("messages").insert({
+            "user_id": user_id,
             "conversation_id": conversation_id,
             "role": "user",
             "content": request.message
@@ -319,9 +321,11 @@ async def send_message(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get AI response: {str(e)}")
     
-    # Save assistant message to Supabase (without user_id)
+    # Save assistant message to Supabase
     try:
+        user_id = user.get("id") or user.get("sub")
         supabase_admin.table("messages").insert({
+            "user_id": user_id,
             "conversation_id": conversation_id,
             "role": "assistant",
             "content": tutor_message
