@@ -441,6 +441,7 @@
                     if (convResponse.ok) {
                         const convData = await convResponse.json();
                         addMessage('ai', convData.response);
+                        await playAudio(convData.response);
                         turnCount++;
                         updateStats();
                     }
@@ -482,6 +483,28 @@
             }, 1000);
         }
 
+        async function playAudio(text) {
+            try {
+                const response = await fetch('/api/speak', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const audioUrl = '/api/audio/' + data.audio_path.split('/').pop();
+                    const audio = new Audio(audioUrl);
+                    await audio.play();
+                }
+            } catch (error) {
+                console.error('Error playing audio:', error);
+            }
+        }
+
         async function startNewConversation() {
             try {
                 const response = await fetch('/api/conversation/start', {
@@ -500,6 +523,7 @@
                     // Clear messages and add greeting
                     messagesContainer.innerHTML = '';
                     addMessage('ai', data.greeting);
+                    await playAudio(data.greeting);
                     
                     // Reset stats
                     wordCount = 0;
