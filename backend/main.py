@@ -467,11 +467,29 @@ async def end_conversation(
         user_id = user.get("id") or user.get("sub")
         print(f"[DEBUG] User ID: {user_id}")
         
+        # Calculate accuracy/fluency score based on conversation metrics
+        # Score based on: words per turn, turn count, duration
+        avg_words_per_turn = total_words / total_turns if total_turns > 0 else 0
+        
+        # Simple scoring algorithm:
+        # - Base score from words per turn (higher = better fluency)
+        # - Bonus for more turns (engagement)
+        # - Bonus for longer duration (persistence)
+        base_score = min(avg_words_per_turn * 5, 50)  # Max 50 points from words/turn
+        turn_bonus = min(total_turns * 2, 30)  # Max 30 points from turns
+        duration_bonus = min(duration_seconds / 30, 20)  # Max 20 points from duration (up to 10 min)
+        
+        accuracy_score = min(base_score + turn_bonus + duration_bonus, 100)
+        accuracy_score = round(accuracy_score, 1)
+        
+        print(f"[DEBUG] Calculated accuracy: {accuracy_score}% (base: {base_score}, turn_bonus: {turn_bonus}, duration_bonus: {duration_bonus})")
+        
         # Update conversation record with end stats
         update_data = {
             "end_time": datetime.now().isoformat(),
             "total_words": total_words,
-            "messages_count": total_turns
+            "messages_count": total_turns,
+            "avg_accuracy": accuracy_score
         }
         
         print(f"[DEBUG] Update data: {update_data}")
@@ -490,7 +508,8 @@ async def end_conversation(
             "conversation_id": conversation_id,
             "total_words": total_words,
             "total_turns": total_turns,
-            "duration_seconds": duration_seconds
+            "duration_seconds": duration_seconds,
+            "accuracy": accuracy_score
         }
     
     except HTTPException:
