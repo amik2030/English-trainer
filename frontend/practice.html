@@ -193,6 +193,45 @@
             border-radius: 8px;
             margin: 1rem 0;
         }
+
+        .progress-dashboard {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 2rem 0;
+        }
+
+        .progress-dashboard h3 {
+            margin: 0 0 1.5rem 0;
+            color: #333;
+        }
+
+        .progress-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            color: white;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -227,6 +266,28 @@
                 <div class="stat-item">
                     <span class="stat-label">Turns:</span>
                     <span class="stat-value" id="turnCount">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="progress-dashboard">
+            <h3>📊 Your Progress</h3>
+            <div class="progress-stats">
+                <div class="stat-card">
+                    <span class="stat-value" id="totalSessions">0</span>
+                    <span class="stat-label">Total Sessions</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="totalWords">0</span>
+                    <span class="stat-label">Words Spoken</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="avgAccuracy">0%</span>
+                    <span class="stat-label">Avg Accuracy</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="totalTime">0m</span>
+                    <span class="stat-label">Total Practice Time</span>
                 </div>
             </div>
         </div>
@@ -534,6 +595,29 @@
             localStorage.removeItem('sb_access_token');
             window.location.href = 'login.html';
         });
+
+        // Load progress stats
+        async function loadProgress() {
+            try {
+                const response = await fetch('/api/progress/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('totalSessions').textContent = data.total_sessions || 0;
+                    document.getElementById('totalWords').textContent = data.total_words || 0;
+                    document.getElementById('avgAccuracy').textContent = (data.avg_accuracy || 0) + '%';
+                    document.getElementById('totalTime').textContent = Math.round((data.total_time || 0) / 60) + 'm';
+                }
+            } catch (error) {
+                console.error('Failed to load progress:', error);
+            }
+        }
+
+        // Load progress on page load
+        loadProgress();
 
         // Auto-start conversation on page load
         startNewConversation();
