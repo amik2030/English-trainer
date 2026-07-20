@@ -479,8 +479,12 @@
 
                 // Get AI response
                 if (conversationId && transcription) {
+                    console.log('Sending message to AI:', transcription);
                     const authToken2 = await getAuthToken();
-                    if (!authToken2) return;
+                    if (!authToken2) {
+                        console.error('Failed to get auth token');
+                        return;
+                    }
 
                     const convResponse = await fetch('/api/conversation/message', {
                         method: 'POST',
@@ -494,13 +498,22 @@
                         })
                     });
 
+                    console.log('AI response status:', convResponse.status);
+                    
                     if (convResponse.ok) {
                         const convData = await convResponse.json();
+                        console.log('AI response received:', convData.response);
                         addMessage('ai', convData.response);
                         await playAudio(convData.response);
                         turnCount++;
                         updateStats();
+                    } else {
+                        const errorData = await convResponse.json().catch(() => ({ detail: 'Unknown error' }));
+                        console.error('AI response error:', errorData);
+                        showError('Failed to get AI response: ' + (errorData.detail || `HTTP ${convResponse.status}`));
                     }
+                } else {
+                    console.log('No conversationId or transcription:', { conversationId, transcription });
                 }
 
                 statusText.textContent = 'Click the microphone to start speaking';
