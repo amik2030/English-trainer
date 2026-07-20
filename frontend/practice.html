@@ -318,6 +318,11 @@
                 <button class="topic-btn" data-topic="hobbies">Hobbies</button>
                 <button class="topic-btn" data-topic="technology">Technology</button>
             </div>
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <button id="startConversationBtn" style="padding: 0.85rem 2.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                    ▶ Start Conversation
+                </button>
+            </div>
         </div>
 
         <div class="conversation-area">
@@ -325,7 +330,7 @@
                 <div class="message ai">
                     <div class="message-avatar">🤖</div>
                     <div class="message-content">
-                        <p class="message-text">Hi! I'm your AI conversation partner. Choose a topic above and click the microphone to start practicing. I'll respond naturally to help you build confidence.</p>
+                        <p class="message-text">Hi! I'm your AI conversation partner. Choose a topic above and click "Start Conversation" to begin. I'll respond naturally to help you build confidence.</p>
                     </div>
                 </div>
             </div>
@@ -383,14 +388,18 @@
         const statusText = document.getElementById('statusText');
         const messagesContainer = document.getElementById('messages');
 
-        // Topic selection
+        // Topic selection (just highlights, doesn't start conversation)
         document.querySelectorAll('.topic-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.topic-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentTopic = btn.dataset.topic;
-                startNewConversation();
             });
+        });
+
+        // Start conversation button
+        document.getElementById('startConversationBtn').addEventListener('click', async () => {
+            await startNewConversation();
         });
 
         // Recording controls
@@ -573,15 +582,15 @@
                     const data = await response.json();
                     conversationId = data.conversation_id;
                     
+                    // Hide start button, show conversation controls
+                    document.getElementById('startConversationBtn').style.display = 'none';
+                    recordBtn.style.display = 'flex';
+                    endConversationBtn.style.display = 'inline-block';
+                    
                     // Clear messages and add greeting
                     messagesContainer.innerHTML = '';
                     addMessage('ai', data.greeting);
                     await playAudio(data.greeting);
-                    
-                    // Show buttons
-                    recordBtn.style.display = 'flex';
-                    endConversationBtn.style.display = 'inline-block';
-                    statusText.textContent = 'Click the microphone to start speaking';
                     
                     // Reset stats
                     wordCount = 0;
@@ -591,6 +600,8 @@
                     // Start timer
                     if (timerInterval) clearInterval(timerInterval);
                     startTimer();
+                    
+                    statusText.textContent = 'Click the microphone to start speaking';
                 } else {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
                     throw new Error(errorData.detail || `HTTP ${response.status}`);
@@ -615,9 +626,10 @@
                 stopRecording();
             }
             conversationId = null;
-            messagesContainer.innerHTML = '<div class="message ai"><div class="message-avatar">🤖</div><div class="message-content"><p class="message-text">Session ended. Select a topic above to start a new conversation.</p></div></div>';
+            messagesContainer.innerHTML = '<div class="message ai"><div class="message-avatar">🤖</div><div class="message-content"><p class="message-text">Session ended. Select a topic above and click "Start Conversation" to begin again.</p></div></div>';
             recordBtn.style.display = 'none';
             endConversationBtn.style.display = 'none';
+            document.getElementById('startConversationBtn').style.display = 'inline-block';
             statusText.textContent = 'Select a topic to begin';
             if (timerInterval) clearInterval(timerInterval);
             document.getElementById('sessionTime').textContent = '0:00';
@@ -659,9 +671,6 @@
 
         // Load progress on page load
         loadProgress();
-
-        // Auto-start conversation on page load
-        startNewConversation();
     </script>
 </body>
 </html>
