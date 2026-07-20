@@ -338,9 +338,9 @@
                 successDiv.textContent = 'Login successful! Redirecting...';
                 successDiv.style.display = 'block';
                 
-                // Redirect to dashboard
+                // Redirect to practice page
                 setTimeout(() => {
-                    window.location.href = 'dashboard.html';
+                    window.location.href = 'practice.html';
                 }, 1000);
             } catch (err) {
                 errorDiv.textContent = 'Login failed: ' + err.message;

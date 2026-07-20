@@ -182,7 +182,7 @@
         async function checkAuth() {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
-                window.location.href = 'dashboard.html';
+                window.location.href = 'practice.html';
             }
         }
         checkAuth();
@@ -235,10 +235,10 @@
                 // Success - redirect to dashboard
                 if (data.session) {
                     localStorage.setItem('sb_access_token', data.session.access_token);
-                    successDiv.textContent = 'Account created! Redirecting to dashboard...';
+                    successDiv.textContent = 'Account created! Redirecting to practice...';
                     successDiv.style.display = 'block';
                     setTimeout(() => {
-                        window.location.href = 'dashboard.html';
+                        window.location.href = 'practice.html';
                     }, 1000);
                 } else if (data.user) {
                     // User created but email confirmation might be required
