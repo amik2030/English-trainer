@@ -627,7 +627,7 @@
         });
 
         // Logout handler
-        document.getElementById('logoutLink').addEventListener('click', function(e) {
+        document.getElementById('logoutLink').addEventListener('click', async function(e) {
             e.preventDefault();
             localStorage.removeItem('sb_access_token');
             await supabaseClient.auth.signOut();
