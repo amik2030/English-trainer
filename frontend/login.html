@@ -290,11 +290,11 @@
         // Initialize Supabase client
         const SUPABASE_URL = 'https://qiapbljkhbpybhqcshjo.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYXBibGpraGJweWJocWNzaGpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyOTE4MDIsImV4cCI6MjA5OTg2NzgwMn0.zba_NfWkl8SpZXXzWeiEcqIH6FSZ2KUnaw94y9CNKkc';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         // Check if user is already logged in
         async function checkAuth() {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await supabaseClient.auth.getSession();
             if (session) {
                 // User is logged in, redirect to practice
                 window.location.href = 'practice.html';
@@ -319,7 +319,7 @@
             submitBtn.disabled = true;
             
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email: email,
                     password: password
                 });
@@ -357,7 +357,7 @@
             if (!email) return;
             
             try {
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
                     redirectTo: window.location.origin + '/login.html'
                 });
                 
@@ -374,7 +374,7 @@
         // Google OAuth login
         document.getElementById('googleLogin').addEventListener('click', async function() {
             try {
-                const { data, error } = await supabase.auth.signInWithOAuth({
+                const { data, error } = await supabaseClient.auth.signInWithOAuth({
                     provider: 'google',
                     options: {
                         redirectTo: window.location.origin + '/trainer.html'
