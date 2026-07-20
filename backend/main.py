@@ -474,18 +474,12 @@ async def end_conversation(
         if not check_result.data:
             raise HTTPException(status_code=404, detail="Conversation not found")
         
-        # Update conversation record with end stats - only update columns that exist
+        # Update conversation record with end stats
         update_data = {
             "end_time": datetime.now().isoformat(),
             "total_words": total_words,
             "messages_count": total_turns
         }
-        
-        # Try to add duration_seconds if column exists
-        try:
-            update_data["duration_seconds"] = duration_seconds
-        except:
-            pass
         
         print(f"[DEBUG] Update data: {update_data}")
         
