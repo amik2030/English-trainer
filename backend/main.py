@@ -219,9 +219,11 @@ async def start_conversation(
     
     tutor_message = response.choices[0].message.content
     
-    # Create conversation record in Supabase (without user_id)
+    # Create conversation record in Supabase
     try:
+        user_id = user.get("id") or user.get("sub")
         result = supabase_admin.table("conversations").insert({
+            "user_id": user_id,
             "topic": request.topic,
             "level": request.level,
             "start_time": datetime.now().isoformat()
