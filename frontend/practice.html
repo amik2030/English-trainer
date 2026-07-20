@@ -349,36 +349,21 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Check authentication and handle expired tokens
-        const token = localStorage.getItem('sb_access_token');
-        if (!token) {
-            window.location.href = 'login.html';
-        }
+        // Supabase client for auto token refresh
+        const SUPABASE_URL = 'https://qiapbljkhbpybhqcshjo.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_k514gfd5YtchDsftJjRqUw_w5uEBayH';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Check if token is expired (Supabase tokens expire after 1 hour)
-        function isTokenExpired(token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                const now = Math.floor(Date.now() / 1000);
-                return payload.exp < now;
-            } catch (e) {
-                return true;
-            }
-        }
-
-        function checkAuth() {
-            if (isTokenExpired(token)) {
-                localStorage.removeItem('sb_access_token');
-                alert('Your session has expired. Please log in again.');
+        // Check authentication using Supabase client
+        async function getAuthToken() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
                 window.location.href = 'login.html';
-                return false;
+                return null;
             }
-            return true;
-        }
-
-        if (!checkAuth()) {
-            // Will redirect to login
+            return session.access_token;
         }
 
         // State
@@ -391,7 +376,6 @@
         let turnCount = 0;
         let sessionStartTime = null;
         let timerInterval = null;
-        const authToken = token;
 
         // DOM elements
         const recordBtn = document.getElementById('recordBtn');
@@ -458,6 +442,9 @@
                 const formData = new FormData();
                 formData.append('file', audioBlob, 'recording.webm');
 
+                const authToken = await getAuthToken();
+                if (!authToken) return;
+
                 const response = await fetch('/api/transcribe', {
                     method: 'POST',
                     headers: {
@@ -483,11 +470,14 @@
 
                 // Get AI response
                 if (conversationId && transcription) {
+                    const authToken2 = await getAuthToken();
+                    if (!authToken2) return;
+
                     const convResponse = await fetch('/api/conversation/message', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${authToken}`
+                            'Authorization': `Bearer ${authToken2}`
                         },
                         body: JSON.stringify({
                             conversation_id: conversationId,
@@ -542,11 +532,14 @@
 
         async function playAudio(text) {
             try {
+                const authToken3 = await getAuthToken();
+                if (!authToken3) return;
+
                 const response = await fetch('/api/speak', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': `Bearer ${authToken3}`
                     },
                     body: JSON.stringify({ text: text })
                 });
@@ -563,17 +556,15 @@
         }
 
         async function startNewConversation() {
-            // Check if token is still valid before making API call
-            if (!checkAuth()) {
-                return;
-            }
+            const authToken4 = await getAuthToken();
+            if (!authToken4) return;
             
             try {
                 const response = await fetch('/api/conversation/start', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': `Bearer ${authToken4}`
                     },
                     body: JSON.stringify({ topic: currentTopic })
                 });
@@ -639,15 +630,19 @@
         document.getElementById('logoutLink').addEventListener('click', function(e) {
             e.preventDefault();
             localStorage.removeItem('sb_access_token');
+            await supabaseClient.auth.signOut();
             window.location.href = 'login.html';
         });
 
         // Load progress stats
         async function loadProgress() {
             try {
+                const authToken5 = await getAuthToken();
+                if (!authToken5) return;
+
                 const response = await fetch('/api/progress/stats', {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': `Bearer ${authToken5}`
                     }
                 });
                 if (response.ok) {
