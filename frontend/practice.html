@@ -144,6 +144,7 @@
         let audioChunks = [];
         let wordCount = 0;
         let turnCount = 0;
+        let grammarErrors = 0;
         let sessionStartTime = null;
         let timerInterval = null;
 
@@ -271,6 +272,12 @@
                         addMessage('ai', convData.response);
                         await playAudio(convData.response);
                         turnCount++;
+                        
+                        // Track grammar errors from this message
+                        if (convData.grammar_errors) {
+                            grammarErrors += convData.grammar_errors;
+                        }
+                        
                         updateStats();
                     } else {
                         const errorData = await convResponse.json().catch(() => ({ detail: 'Unknown error' }));
@@ -421,7 +428,8 @@
                                 conversation_id: conversationId,
                                 total_words: wordCount,
                                 total_turns: turnCount,
-                                duration_seconds: duration
+                                duration_seconds: duration,
+                                grammar_errors: grammarErrors
                             })
                         });
                     }
@@ -440,6 +448,7 @@
             document.getElementById('sessionTime').textContent = '0:00';
             wordCount = 0;
             turnCount = 0;
+            grammarErrors = 0;
             updateStats();
             
             // Refresh progress stats and conversation history

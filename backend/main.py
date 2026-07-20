@@ -284,17 +284,54 @@ async def send_message(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load conversation: {str(e)}")
     
-    # Save user message to Supabase
+    # Check grammar of user message
+    grammar_errors = 0
     try:
-        user_id = user.get("id") or user.get("sub")
+        grammar_check_prompt = f"""Analyze this English text for grammar errors. Count the number of grammar mistakes.
+        Text: "{request.message}"
+        
+        Return ONLY a JSON object with this format:
+        {{"error_count": <number>, "errors": [<list of brief error descriptions>]}}
+        
+        If there are no errors, return {{"error_count": 0, "errors": []}}"""
+        
+        grammar_response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a grammar checker. Analyze text for grammar errors only."},
+                {"role": "user", "content": grammar_check_prompt}
+            ],
+            max_tokens=150,
+            temperature=0
+        )
+        
+        import json
+        grammar_result = json.loads(grammar_response.choices[0].message.content)
+        grammar_errors = grammar_result.get("error_count", 0)
+        print(f"[DEBUG] Grammar check: {grammar_errors} errors in message: {request.message[:50]}...")
+        
+    except Exception as e:
+        print(f"[ERROR] Grammar check failed: {e}")
+        # Continue without grammar check if it fails
+    
+    # Save user message to Supabase with grammar error count
+    try:
         supabase_admin.table("messages").insert({
-            "user_id": user_id,
             "conversation_id": conversation_id,
             "role": "user",
-            "content": request.message
+            "content": request.message,
+            "grammar_errors": grammar_errors
         }).execute()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save user message: {str(e)}")
+        # If grammar_errors column doesn't exist, save without it
+        try:
+            supabase_admin.table("messages").insert({
+                "conversation_id": conversation_id,
+                "role": "user",
+                "content": request.message
+            }).execute()
+        except Exception as e2:
+            raise HTTPException(status_code=500, detail=f"Failed to save user message: {str(e2)}")
     
     # Load message history from Supabase
     try:
@@ -323,9 +360,7 @@ async def send_message(
     
     # Save assistant message to Supabase
     try:
-        user_id = user.get("id") or user.get("sub")
         supabase_admin.table("messages").insert({
-            "user_id": user_id,
             "conversation_id": conversation_id,
             "role": "assistant",
             "content": tutor_message
@@ -335,7 +370,8 @@ async def send_message(
         print(f"Failed to save assistant message: {e}")
     
     return {
-        "response": tutor_message
+        "response": tutor_message,
+        "grammar_errors": grammar_errors
     }
 
 
@@ -457,8 +493,9 @@ async def end_conversation(
     total_words = request.get("total_words", 0)
     total_turns = request.get("total_turns", 0)
     duration_seconds = request.get("duration_seconds", 0)
+    grammar_errors = request.get("grammar_errors", 0)
     
-    print(f"[DEBUG] Ending conversation: id={conversation_id}, words={total_words}, turns={total_turns}, duration={duration_seconds}")
+    print(f"[DEBUG] Ending conversation: id={conversation_id}, words={total_words}, turns={total_turns}, grammar_errors={grammar_errors}")
     
     if not conversation_id:
         raise HTTPException(status_code=400, detail="conversation_id is required")
@@ -467,22 +504,17 @@ async def end_conversation(
         user_id = user.get("id") or user.get("sub")
         print(f"[DEBUG] User ID: {user_id}")
         
-        # Calculate accuracy/fluency score based on conversation metrics
-        # Score based on: words per turn, turn count, duration
-        avg_words_per_turn = total_words / total_turns if total_turns > 0 else 0
+        # Calculate accuracy score based on grammar errors
+        # Simple formula: 100% - (errors per turn * penalty)
+        # Each grammar error reduces score by 5 points
+        if total_turns > 0:
+            errors_per_turn = grammar_errors / total_turns
+            accuracy_score = max(0, 100 - (grammar_errors * 5))
+        else:
+            accuracy_score = 100
         
-        # Simple scoring algorithm:
-        # - Base score from words per turn (higher = better fluency)
-        # - Bonus for more turns (engagement)
-        # - Bonus for longer duration (persistence)
-        base_score = min(avg_words_per_turn * 5, 50)  # Max 50 points from words/turn
-        turn_bonus = min(total_turns * 2, 30)  # Max 30 points from turns
-        duration_bonus = min(duration_seconds / 30, 20)  # Max 20 points from duration (up to 10 min)
-        
-        accuracy_score = min(base_score + turn_bonus + duration_bonus, 100)
         accuracy_score = round(accuracy_score, 1)
-        
-        print(f"[DEBUG] Calculated accuracy: {accuracy_score}% (base: {base_score}, turn_bonus: {turn_bonus}, duration_bonus: {duration_bonus})")
+        print(f"[DEBUG] Calculated accuracy: {accuracy_score}% (grammar_errors: {grammar_errors})")
         
         # Update conversation record with end stats
         update_data = {
@@ -509,7 +541,8 @@ async def end_conversation(
             "total_words": total_words,
             "total_turns": total_turns,
             "duration_seconds": duration_seconds,
-            "accuracy": accuracy_score
+            "accuracy": accuracy_score,
+            "grammar_errors": grammar_errors
         }
     
     except HTTPException:
