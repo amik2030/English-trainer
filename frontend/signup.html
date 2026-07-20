@@ -146,7 +146,7 @@
                 <p>Start your English speaking journey</p>
             </div>
 
-            <form class="signup-form" id="signupForm" method="POST" action="#">
+            <form class="signup-form" id="signupForm">
                 <div id="errorMessage" style="display: none; background: #ffe0e0; color: #d32f2f; padding: 12px; border-radius: 8px; margin-bottom: 16px;"></div>
                 <div id="successMessage" style="display: none; background: #e0ffe0; color: #2f7d2f; padding: 12px; border-radius: 8px; margin-bottom: 16px;"></div>
                 
@@ -160,7 +160,7 @@
                     <input type="password" id="password" name="password" placeholder="Min 6 characters" required minlength="6">
                 </div>
 
-                <button type="submit" class="signup-btn">Sign Up</button>
+                <button type="button" class="signup-btn" id="signupBtn">Sign Up</button>
             </form>
 
             <div class="signup-footer">
@@ -188,8 +188,9 @@
         checkAuth();
         
         // Signup form handler
-        document.getElementById('signupForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('signupBtn').addEventListener('click', async function(e) {
+                e.preventDefault();
             
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
@@ -258,6 +259,7 @@
                 submitBtn.textContent = 'Sign Up';
                 submitBtn.disabled = false;
             }
+        });
         });
     </script>
 </body>
