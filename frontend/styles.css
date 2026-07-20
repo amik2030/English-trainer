@@ -1055,6 +1055,37 @@ section {
     padding: 1.5rem;
 }
 
+.session-stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.session-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: white;
+}
+
+.session-stat-icon {
+    font-size: 1.2rem;
+}
+
+.session-stat-value {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.session-stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
 .messages {
     max-height: 400px;
     overflow-y: auto;

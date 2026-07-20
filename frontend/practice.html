@@ -23,24 +23,6 @@
     </nav>
 
     <div class="practice-container">
-        <div class="practice-header">
-            <h1>Practice Conversation</h1>
-            <div class="stats-bar">
-                <div class="stat-item">
-                    <span class="stat-label">Time:</span>
-                    <span class="stat-value" id="sessionTime">0:00</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Words:</span>
-                    <span class="stat-value" id="wordCount">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Turns:</span>
-                    <span class="stat-value" id="turnCount">0</span>
-                </div>
-            </div>
-        </div>
-
         <div class="progress-dashboard">
             <h3>📊 Your Progress</h3>
             <div class="progress-stats">
@@ -81,6 +63,22 @@
         </div>
 
         <div class="conversation-area">
+            <div class="session-stats-bar">
+                <div class="session-stat">
+                    <span class="session-stat-icon">⏱️</span>
+                    <span class="session-stat-value" id="sessionTime">0:00</span>
+                </div>
+                <div class="session-stat">
+                    <span class="session-stat-icon">📝</span>
+                    <span class="session-stat-value" id="wordCount">0</span>
+                    <span class="session-stat-label">words</span>
+                </div>
+                <div class="session-stat">
+                    <span class="session-stat-icon">💬</span>
+                    <span class="session-stat-value" id="turnCount">0</span>
+                    <span class="session-stat-label">turns</span>
+                </div>
+            </div>
             <div class="messages" id="messages">
                 <div class="message ai">
                     <div class="message-avatar">🤖</div>
