@@ -452,7 +452,11 @@
             messagesContainer.innerHTML = '<div class="message ai"><div class="message-avatar"></div><div class="message-content"><p class="message-text">Session ended. Select a topic above and click "Start Conversation" to begin again.</p></div></div>';
             recordBtn.style.display = 'none';
             endConversationBtn.style.display = 'none';
-            document.getElementById('startConversationBtn').style.display = 'inline-block';
+            const startBtn = document.getElementById('startConversationBtn');
+            startBtn.classList.remove('loading');
+            startBtn.disabled = false;
+            startBtn.innerHTML = '▶ Start Conversation';
+            startBtn.style.display = 'inline-block';
             statusText.textContent = 'Select a topic to begin';
             if (timerInterval) clearInterval(timerInterval);
             document.getElementById('sessionTime').textContent = '0:00';
