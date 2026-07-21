@@ -1494,7 +1494,14 @@ section {
     }
 
     .timeline-line {
-        display: none;
+        /* Vertical line for mobile */
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        right: auto;
+        width: 3px;
+        height: 100%;
+        transform: translateX(-50%);
     }
 
     .timeline-step {
