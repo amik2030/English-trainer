@@ -501,19 +501,37 @@
                             <div class="score-flash-stat-label">Accuracy</div>
                         </div>
                     </div>
+                    <div class="score-flash-countdown">
+                        <div class="countdown-circle">
+                            <span class="countdown-number">7</span>
+                        </div>
+                    </div>
                 </div>
             `;
             conversationArea.style.position = 'relative';
             conversationArea.appendChild(scoreFlash);
             
-            // Wait 2 seconds, then hide flash and exit focus mode
+            // Countdown timer
+            let countdown = 7;
+            const countdownNumber = scoreFlash.querySelector('.countdown-number');
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdownNumber) {
+                    countdownNumber.textContent = countdown;
+                }
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+            
+            // Wait 7 seconds, then hide flash and exit focus mode
             setTimeout(() => {
                 scoreFlash.style.animation = 'scoreFlashOut 0.3s ease';
                 setTimeout(() => {
                     scoreFlash.remove();
                     document.body.classList.remove('focus-mode');
                 }, 300);
-            }, 2000);
+            }, 7000);
             
             // Save conversation stats before ending
             if (conversationId) {

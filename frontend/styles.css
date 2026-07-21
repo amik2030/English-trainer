@@ -1184,6 +1184,39 @@ body.focus-mode .conversation-area {
     margin-top: 0.3rem;
 }
 
+.score-flash-countdown {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+.countdown-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 3px solid rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: countdownPulse 1s ease-in-out infinite;
+}
+
+.countdown-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: white;
+}
+
+@keyframes countdownPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
 .session-stats-bar {
     display: flex;
     justify-content: center;
