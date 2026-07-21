@@ -3216,3 +3216,349 @@ section {
         font-size: 1.8rem;
     }
 }
+
+/* ============================================
+   METHODOLOGY PAGE - ENHANCED PARTNERSHIP
+   ============================================ */
+
+/* Partnership Section - Hero Treatment */
+.method-partnership-section {
+    padding: 6rem 2rem;
+    background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.method-partnership-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.method-partnership-header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.method-partnership-header h2 {
+    font-size: 2.8rem;
+    color: #333;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.method-partnership-intro {
+    font-size: 1.25rem;
+    color: #555;
+    max-width: 800px;
+    margin: 0 auto;
+    line-height: 1.7;
+}
+
+.method-partnership-intro strong {
+    color: #667eea;
+    font-weight: 600;
+}
+
+/* Partnership Visual - Circular Feedback Loop */
+.method-partnership-visual {
+    margin: 4rem auto;
+    max-width: 700px;
+}
+
+.partnership-ring {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 1rem;
+    padding: 2rem;
+}
+
+.partnership-node {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.12);
+    border: 2px solid transparent;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.partnership-node:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 16px 50px rgba(102, 126, 234, 0.25);
+    border-color: #667eea;
+}
+
+.partnership-node-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+}
+
+.partnership-node-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+}
+
+.partnership-node-desc {
+    font-size: 0.85rem;
+    color: #666;
+    line-height: 1.4;
+}
+
+.partnership-node-top {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.partnership-node-right {
+    grid-column: 3;
+    grid-row: 2;
+}
+
+.partnership-node-bottom {
+    grid-column: 2;
+    grid-row: 3;
+}
+
+.partnership-node-left {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.partnership-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.partnership-connector svg {
+    width: 100%;
+    height: 100%;
+}
+
+.partnership-connector-right {
+    grid-column: 3;
+    grid-row: 1;
+    transform: rotate(90deg);
+}
+
+.partnership-connector-bottom {
+    grid-column: 3;
+    grid-row: 3;
+    transform: rotate(180deg);
+}
+
+.partnership-connector-left {
+    grid-column: 1;
+    grid-row: 3;
+    transform: rotate(270deg);
+}
+
+.partnership-center {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    width: 140px;
+    height: 140px;
+    margin: auto;
+    box-shadow: 0 12px 40px rgba(102, 126, 234, 0.3);
+}
+
+.partnership-center-text {
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.3;
+}
+
+/* Four Levels of Involvement */
+.partnership-levels {
+    margin: 5rem 0;
+}
+
+.partnership-levels h3 {
+    font-size: 2rem;
+    color: #333;
+    text-align: center;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.partnership-levels-intro {
+    font-size: 1.1rem;
+    color: #666;
+    text-align: center;
+    max-width: 700px;
+    margin: 0 auto 3rem;
+    line-height: 1.6;
+}
+
+.partnership-levels-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+}
+
+.partnership-level-card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid #e9ecef;
+    display: flex;
+    gap: 1.5rem;
+    transition: all 0.3s;
+}
+
+.partnership-level-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.level-number {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.level-content h4 {
+    font-size: 1.15rem;
+    color: #333;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+.level-content p {
+    font-size: 0.95rem;
+    color: #666;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* What Makes This Different */
+.partnership-different {
+    margin: 5rem 0;
+}
+
+.partnership-different h3 {
+    font-size: 2rem;
+    color: #333;
+    text-align: center;
+    margin-bottom: 3rem;
+    font-weight: 700;
+}
+
+.partnership-different-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2.5rem;
+}
+
+.partnership-different-card {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border-radius: 20px;
+    padding: 2.5rem;
+    text-align: center;
+    border: 2px solid transparent;
+    transition: all 0.4s;
+}
+
+.partnership-different-card:hover {
+    background: white;
+    border-color: #667eea;
+    transform: translateY(-6px);
+    box-shadow: 0 16px 50px rgba(102, 126, 234, 0.2);
+}
+
+.different-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
+    filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.3));
+}
+
+.partnership-different-card h4 {
+    font-size: 1.3rem;
+    color: #333;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.partnership-different-card p {
+    font-size: 1rem;
+    color: #666;
+    line-height: 1.7;
+    margin: 0;
+}
+
+/* Responsive for partnership section */
+@media (max-width: 768px) {
+    .method-partnership-header h2 {
+        font-size: 2rem;
+    }
+
+    .method-partnership-intro {
+        font-size: 1.05rem;
+    }
+
+    .partnership-ring {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        aspect-ratio: auto;
+        gap: 1.5rem;
+    }
+
+    .partnership-node {
+        grid-column: 1 !important;
+        grid-row: auto !important;
+    }
+
+    .partnership-connector {
+        display: none;
+    }
+
+    .partnership-center {
+        width: 100px;
+        height: 100px;
+    }
+
+    .partnership-center-text {
+        font-size: 0.85rem;
+    }
+
+    .partnership-levels h3,
+    .partnership-different h3 {
+        font-size: 1.6rem;
+    }
+
+    .partnership-level-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .level-number {
+        margin: 0 auto;
+    }
+}
