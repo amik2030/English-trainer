@@ -474,7 +474,7 @@
             
             // Calculate stats before ending
             const duration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
-            const accuracy = totalTurns > 0 ? Math.round(((totalTurns - grammarErrors) / totalTurns) * 100) : 100;
+            const accuracy = turnCount > 0 ? Math.round(((turnCount - grammarErrors) / turnCount) * 100) : 100;
             
             // Show score flash
             const conversationArea = document.querySelector('.conversation-area');
