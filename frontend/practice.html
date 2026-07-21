@@ -351,6 +351,13 @@
             const authToken4 = await getAuthToken();
             if (!authToken4) return;
             
+            const startBtn = document.getElementById('startConversationBtn');
+            
+            // Show loading state
+            startBtn.classList.add('loading');
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<span class="btn-spinner"></span>Starting...';
+            
             try {
                 const response = await fetch('/api/conversation/start', {
                     method: 'POST',
@@ -366,7 +373,7 @@
                     conversationId = data.conversation_id;
                     
                     // Hide start button, show conversation controls
-                    document.getElementById('startConversationBtn').style.display = 'none';
+                    startBtn.style.display = 'none';
                     recordBtn.style.display = 'flex';
                     endConversationBtn.style.display = 'inline-block';
                     
@@ -392,6 +399,11 @@
             } catch (error) {
                 showError('Failed to start conversation: ' + error.message);
                 console.error('Failed to start conversation:', error);
+                
+                // Reset button state on error
+                startBtn.classList.remove('loading');
+                startBtn.disabled = false;
+                startBtn.innerHTML = '▶ Start Conversation';
             }
         }
 
