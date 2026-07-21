@@ -145,6 +145,10 @@
         let grammarErrors = 0;
         let sessionStartTime = null;
         let timerInterval = null;
+        
+        // Audio element for iOS Safari compatibility
+        // Created during user gesture to allow playback after async operations
+        let audioElement = null;
 
         // DOM elements
         const recordBtn = document.getElementById('recordBtn');
@@ -163,6 +167,12 @@
 
         // Start conversation button
         document.getElementById('startConversationBtn').addEventListener('click', async () => {
+            // Create audio element synchronously during user gesture
+            // iOS Safari requires this to allow playback after async operations
+            if (!audioElement) {
+                audioElement = new Audio();
+                audioElement.preload = 'auto';
+            }
             await startNewConversation();
         });
 
@@ -339,8 +349,27 @@
                 if (response.ok) {
                     const data = await response.json();
                     const filename = data.filename;
-                    const audio = new Audio(`/api/audio/${filename}`);
-                    audio.play().catch(e => console.error('Audio play failed:', e));
+                    
+                    // Use the pre-created audio element for iOS compatibility
+                    // iOS Safari blocks audio.play() after async operations unless
+                    // the Audio element was created during a user gesture
+                    if (audioElement) {
+                        audioElement.src = `/api/audio/${filename}`;
+                        audioElement.load();
+                        const playPromise = audioElement.play();
+                        if (playPromise) {
+                            playPromise.catch(e => {
+                                console.error('Audio play failed:', e);
+                                // Fallback: create new Audio element (works on non-iOS)
+                                const fallbackAudio = new Audio(`/api/audio/${filename}`);
+                                fallbackAudio.play().catch(() => {});
+                            });
+                        }
+                    } else {
+                        // Fallback for browsers where audioElement wasn't created
+                        const audio = new Audio(`/api/audio/${filename}`);
+                        audio.play().catch(e => console.error('Audio play failed:', e));
+                    }
                 }
             } catch (error) {
                 console.error('Error playing audio:', error);
@@ -457,6 +486,13 @@
             startBtn.disabled = false;
             startBtn.innerHTML = '▶ Start Conversation';
             startBtn.style.display = 'inline-block';
+            
+            // Clean up audio element
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.src = '';
+                audioElement = null;
+            }
             statusText.textContent = 'Select a topic to begin';
             if (timerInterval) clearInterval(timerInterval);
             document.getElementById('sessionTime').textContent = '0:00';
