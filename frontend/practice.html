@@ -427,6 +427,12 @@
                     if (timerInterval) clearInterval(timerInterval);
                     startTimer();
                     
+                    // Enable focus mode - dim everything else
+                    document.body.classList.add('focus-mode');
+                    
+                    // Scroll to conversation area
+                    document.querySelector('.conversation-area').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
                     statusText.textContent = 'Click the microphone to start speaking';
                 } else {
                     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -500,6 +506,10 @@
                 audioElement.src = '';
                 audioElement = null;
             }
+            
+            // Disable focus mode
+            document.body.classList.remove('focus-mode');
+            
             statusText.textContent = 'Select a topic to begin';
             if (timerInterval) clearInterval(timerInterval);
             document.getElementById('sessionTime').textContent = '0:00';
