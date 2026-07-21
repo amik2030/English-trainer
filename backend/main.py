@@ -755,6 +755,14 @@ async def serve_signup():
     raise HTTPException(status_code=404, detail="Signup page not found")
 
 
+@app.get("/methodology.html")
+async def serve_methodology():
+    methodology_path = Path(__file__).parent.parent / "frontend" / "methodology.html"
+    if methodology_path.exists():
+        return FileResponse(methodology_path)
+    raise HTTPException(status_code=404, detail="Methodology page not found")
+
+
 @app.get("/styles.css")
 async def serve_styles():
     css_path = Path(__file__).parent.parent / "frontend" / "styles.css"
