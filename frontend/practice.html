@@ -472,13 +472,54 @@
                 stopRecording();
             }
             
+            // Calculate stats before ending
+            const duration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
+            const accuracy = totalTurns > 0 ? Math.round(((totalTurns - grammarErrors) / totalTurns) * 100) : 100;
+            
+            // Show score flash
+            const conversationArea = document.querySelector('.conversation-area');
+            const scoreFlash = document.createElement('div');
+            scoreFlash.className = 'score-flash-overlay';
+            scoreFlash.innerHTML = `
+                <div class="score-flash-content">
+                    <div class="score-flash-title">Session Complete!</div>
+                    <div class="score-flash-stats">
+                        <div class="score-flash-stat">
+                            <div class="score-flash-stat-value">${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}</div>
+                            <div class="score-flash-stat-label">Duration</div>
+                        </div>
+                        <div class="score-flash-stat">
+                            <div class="score-flash-stat-value">${wordCount}</div>
+                            <div class="score-flash-stat-label">Words</div>
+                        </div>
+                        <div class="score-flash-stat">
+                            <div class="score-flash-stat-value">${turnCount}</div>
+                            <div class="score-flash-stat-label">Turns</div>
+                        </div>
+                        <div class="score-flash-stat">
+                            <div class="score-flash-stat-value">${accuracy}%</div>
+                            <div class="score-flash-stat-label">Accuracy</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            conversationArea.style.position = 'relative';
+            conversationArea.appendChild(scoreFlash);
+            
+            // Wait 2 seconds, then hide flash and exit focus mode
+            setTimeout(() => {
+                scoreFlash.style.animation = 'scoreFlashOut 0.3s ease';
+                setTimeout(() => {
+                    scoreFlash.remove();
+                    document.body.classList.remove('focus-mode');
+                }, 300);
+            }, 2000);
+            
             // Save conversation stats before ending
             if (conversationId) {
                 try {
                     const authToken = await getAuthToken();
                     if (authToken) {
-                        const duration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
-                        
                         await fetch('/api/conversation/end', {
                             method: 'POST',
                             headers: {
@@ -515,9 +556,6 @@
                 audioElement.src = '';
                 audioElement = null;
             }
-            
-            // Disable focus mode
-            document.body.classList.remove('focus-mode');
             
             statusText.textContent = 'Select a topic to begin';
             if (timerInterval) clearInterval(timerInterval);
