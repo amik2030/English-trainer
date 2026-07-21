@@ -408,6 +408,9 @@
                     const data = await response.json();
                     conversationId = data.conversation_id;
                     
+                    // Enable focus mode FIRST - before showing conversation
+                    document.body.classList.add('focus-mode');
+                    
                     // Hide start button, show conversation controls
                     startBtn.style.display = 'none';
                     recordBtn.style.display = 'flex';
@@ -416,6 +419,12 @@
                     // Clear messages and add greeting
                     messagesContainer.innerHTML = '';
                     addMessage('ai', data.greeting);
+                    
+                    // Scroll to conversation area after focus mode is active
+                    setTimeout(() => {
+                        document.querySelector('.conversation-area').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                    
                     await playAudio(data.greeting);
                     
                     // Reset stats
