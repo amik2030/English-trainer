@@ -3562,3 +3562,284 @@ section {
         margin: 0 auto;
     }
 }
+
+/* ============================================
+   METHODOLOGY PAGE - SIMPLIFIED
+   ============================================ */
+
+/* Base section styles */
+.method-section {
+    padding: 5rem 2rem;
+    background: white;
+}
+
+.method-section-alt {
+    background: #f8f9fa;
+}
+
+.method-container {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.method-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.method-header h2 {
+    font-size: 2.2rem;
+    color: #333;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.method-intro {
+    font-size: 1.1rem;
+    color: #666;
+    max-width: 700px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* Simple feedback loop */
+.method-loop-simple {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 16px;
+    margin: 3rem 0;
+}
+
+.loop-step {
+    text-align: center;
+    padding: 1.5rem;
+    min-width: 140px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    transition: all 0.3s;
+}
+
+.loop-step:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+}
+
+.loop-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.loop-label {
+    font-weight: 700;
+    color: #667eea;
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+}
+
+.loop-desc {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.loop-arrow {
+    font-size: 1.5rem;
+    color: #667eea;
+    font-weight: 700;
+}
+
+/* What makes this different */
+.method-different-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin: 3rem 0;
+}
+
+.method-different-card {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.method-different-card:hover {
+    background: white;
+    border-color: #667eea;
+    transform: translateY(-4px);
+    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.15);
+}
+
+.method-different-card .different-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.method-different-card h4 {
+    font-size: 1.2rem;
+    color: #333;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+.method-different-card p {
+    font-size: 0.95rem;
+    color: #666;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Four levels */
+.method-levels {
+    margin: 4rem 0 0;
+}
+
+.method-levels h3 {
+    font-size: 1.8rem;
+    color: #333;
+    text-align: center;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.method-levels-intro {
+    font-size: 1rem;
+    color: #666;
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 2.5rem;
+}
+
+.method-levels-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+}
+
+.method-level-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    border: 1px solid #e9ecef;
+    display: flex;
+    gap: 1.25rem;
+    transition: all 0.3s;
+}
+
+.method-level-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.12);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.method-level-card .level-number {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.method-level-card .level-content h4 {
+    font-size: 1.05rem;
+    color: #333;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.method-level-card .level-content p {
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Value for learners */
+.method-value-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin: 3rem 0;
+}
+
+.method-value-card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid #e9ecef;
+    transition: all 0.3s;
+}
+
+.method-value-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.15);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.method-value-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.method-value-card h4 {
+    font-size: 1.2rem;
+    color: #333;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+.method-value-card p {
+    font-size: 0.95rem;
+    color: #666;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .method-header h2 {
+        font-size: 1.8rem;
+    }
+
+    .method-intro {
+        font-size: 1rem;
+    }
+
+    .method-loop-simple {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .loop-arrow {
+        transform: rotate(90deg);
+    }
+
+    .method-levels h3 {
+        font-size: 1.5rem;
+    }
+
+    .method-level-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .method-level-card .level-number {
+        margin: 0 auto;
+    }
+}
