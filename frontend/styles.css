@@ -1084,9 +1084,12 @@ body.focus-mode::before {
 }
 
 body.focus-mode .practice-container {
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 1000;
-    height: 100vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -1103,7 +1106,7 @@ body.focus-mode .conversation-area {
     margin: 0;
     /* Fixed viewport height */
     height: 100%;
-    max-height: 700px;
+    max-height: 600px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
