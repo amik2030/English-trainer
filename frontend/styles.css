@@ -1092,34 +1092,57 @@ body.focus-mode .conversation-area {
     background: white;
     box-shadow: 0 0 60px rgba(102, 126, 234, 0.4), 0 20px 60px rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(102, 126, 234, 0.3);
-    transform: scale(1.02);
     border-radius: 20px;
-    margin: 2rem 0;
-    /* Fix: constrain height and use flex layout */
-    max-height: calc(100vh - 6rem);
+    margin: 1rem auto;
+    /* Fixed height layout */
+    height: calc(100vh - 120px);
+    max-height: 800px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    padding: 1rem 1.5rem;
 }
 
 body.focus-mode .session-stats-bar {
     flex-shrink: 0;
+    margin-bottom: 0.75rem;
 }
 
 body.focus-mode .messages {
-    /* Fix: allow messages to scroll within constrained area */
+    /* Scrollable message area */
     flex: 1;
-    min-height: 150px;
-    max-height: none;
+    min-height: 0;
     overflow-y: auto;
+    margin-bottom: 0.75rem;
+    /* Custom scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #667eea #f0f0f0;
+}
+
+body.focus-mode .messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.focus-mode .messages::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 3px;
+}
+
+body.focus-mode .messages::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 3px;
 }
 
 body.focus-mode .voice-controls {
-    /* Fix: keep controls visible at bottom */
+    /* Fixed controls at bottom */
     flex-shrink: 0;
-    border-top: 1px solid #e9ecef;
-    padding-top: 1rem;
+    border-top: 2px solid #e9ecef;
+    padding: 1rem 0 0.5rem;
     background: white;
+    border-radius: 0 0 18px 18px;
+    margin: 0 -1.5rem -1rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
 
 body.focus-mode .progress-dashboard,
