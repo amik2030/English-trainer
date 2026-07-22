@@ -1104,9 +1104,8 @@ body.focus-mode .conversation-area {
     border: 2px solid rgba(102, 126, 234, 0.3);
     border-radius: 20px;
     margin: 0;
-    /* Fixed viewport height */
-    height: 100%;
-    max-height: 600px;
+    /* STRICT fixed height */
+    height: 600px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
