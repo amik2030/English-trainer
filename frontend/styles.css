@@ -1093,27 +1093,27 @@ body.focus-mode .conversation-area {
     box-shadow: 0 0 60px rgba(102, 126, 234, 0.4), 0 20px 60px rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(102, 126, 234, 0.3);
     border-radius: 20px;
-    margin: 1rem auto;
-    /* Fixed height layout */
-    height: calc(100vh - 120px);
-    max-height: 800px;
+    margin: 0 auto;
+    /* Fixed viewport height */
+    height: 85vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 1rem 1.5rem;
+    padding: 1.5rem;
 }
 
 body.focus-mode .session-stats-bar {
     flex-shrink: 0;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
 }
 
 body.focus-mode .messages {
-    /* Scrollable message area */
-    flex: 1;
+    /* Scrollable area - critical: min-height: 0 for flex */
+    flex: 1 1 0;
     min-height: 0;
     overflow-y: auto;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    padding-right: 0.5rem;
     /* Custom scrollbar */
     scrollbar-width: thin;
     scrollbar-color: #667eea #f0f0f0;
@@ -1134,15 +1134,11 @@ body.focus-mode .messages::-webkit-scrollbar-thumb {
 }
 
 body.focus-mode .voice-controls {
-    /* Fixed controls at bottom */
+    /* Fixed at bottom */
     flex-shrink: 0;
     border-top: 2px solid #e9ecef;
-    padding: 1rem 0 0.5rem;
+    padding-top: 1rem;
     background: white;
-    border-radius: 0 0 18px 18px;
-    margin: 0 -1.5rem -1rem;
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
 }
 
 body.focus-mode .progress-dashboard,
