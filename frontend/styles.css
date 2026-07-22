@@ -1086,6 +1086,13 @@ body.focus-mode::before {
 body.focus-mode .practice-container {
     position: relative;
     z-index: 1000;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
 }
 
 body.focus-mode .conversation-area {
@@ -1093,9 +1100,10 @@ body.focus-mode .conversation-area {
     box-shadow: 0 0 60px rgba(102, 126, 234, 0.4), 0 20px 60px rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(102, 126, 234, 0.3);
     border-radius: 20px;
-    margin: 0 auto;
+    margin: 0;
     /* Fixed viewport height */
-    height: 85vh;
+    height: 100%;
+    max-height: 700px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
