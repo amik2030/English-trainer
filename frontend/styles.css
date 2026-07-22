@@ -1095,6 +1095,31 @@ body.focus-mode .conversation-area {
     transform: scale(1.02);
     border-radius: 20px;
     margin: 2rem 0;
+    /* Fix: constrain height and use flex layout */
+    max-height: calc(100vh - 6rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+body.focus-mode .session-stats-bar {
+    flex-shrink: 0;
+}
+
+body.focus-mode .messages {
+    /* Fix: allow messages to scroll within constrained area */
+    flex: 1;
+    min-height: 150px;
+    max-height: none;
+    overflow-y: auto;
+}
+
+body.focus-mode .voice-controls {
+    /* Fix: keep controls visible at bottom */
+    flex-shrink: 0;
+    border-top: 1px solid #e9ecef;
+    padding-top: 1rem;
+    background: white;
 }
 
 body.focus-mode .progress-dashboard,
