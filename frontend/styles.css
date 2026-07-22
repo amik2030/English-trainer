@@ -1084,18 +1084,8 @@ body.focus-mode::before {
 }
 
 body.focus-mode .practice-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position: relative;
     z-index: 1000;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 2rem;
 }
 
 body.focus-mode .conversation-area {
@@ -1103,52 +1093,50 @@ body.focus-mode .conversation-area {
     box-shadow: 0 0 60px rgba(102, 126, 234, 0.4), 0 20px 60px rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(102, 126, 234, 0.3);
     border-radius: 20px;
-    margin: 0;
-    /* STRICT fixed height */
+    margin: 2rem auto;
+    /* Fixed height chat interface */
     height: 600px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 1.5rem;
 }
 
 body.focus-mode .session-stats-bar {
     flex-shrink: 0;
-    margin-bottom: 1rem;
+    border-radius: 18px 18px 0 0;
 }
 
 body.focus-mode .messages {
-    /* Scrollable area - critical: min-height: 0 for flex */
-    flex: 1 1 0;
-    min-height: 0;
+    /* Scrollable chat area */
+    flex: 1;
     overflow-y: auto;
-    margin-bottom: 1rem;
-    padding-right: 0.5rem;
-    /* Custom scrollbar */
-    scrollbar-width: thin;
-    scrollbar-color: #667eea #f0f0f0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 0;
+    margin: 0;
+    min-height: 0;
 }
 
 body.focus-mode .messages::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
 }
 
 body.focus-mode .messages::-webkit-scrollbar-track {
     background: #f0f0f0;
-    border-radius: 3px;
 }
 
 body.focus-mode .messages::-webkit-scrollbar-thumb {
     background: #667eea;
-    border-radius: 3px;
+    border-radius: 4px;
 }
 
 body.focus-mode .voice-controls {
-    /* Fixed at bottom */
+    /* Fixed controls at bottom */
     flex-shrink: 0;
     border-top: 2px solid #e9ecef;
-    padding-top: 1rem;
+    padding: 1rem;
     background: white;
+    border-radius: 0 0 18px 18px;
 }
 
 body.focus-mode .progress-dashboard,
