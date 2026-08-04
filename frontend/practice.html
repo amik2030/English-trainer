@@ -149,7 +149,7 @@
         let audioChunks = [];
         let wordCount = 0;
         let turnCount = 0;
-        let grammarErrors = 0;
+        let grammarScores = []; // Track individual grammar scores (0-100)
         let sessionStartTime = null;
         let timerInterval = null;
         
@@ -288,9 +288,10 @@
                         await playAudio(convData.response);
                         turnCount++;
                         
-                        // Track grammar errors from this message
-                        if (convData.grammar_errors) {
-                            grammarErrors += convData.grammar_errors;
+                        // Track grammar score from this message
+                        if (convData.grammar && convData.grammar.score !== undefined) {
+                            grammarScores.push(convData.grammar.score);
+                            console.log('Grammar score received:', convData.grammar.score);
                         }
                         
                         updateStats();
@@ -474,7 +475,10 @@
             
             // Calculate stats before ending
             const duration = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
-            const accuracy = turnCount > 0 ? Math.round(((turnCount - grammarErrors) / turnCount) * 100) : 100;
+            // Calculate average accuracy from grammar scores
+            const accuracy = grammarScores.length > 0 
+                ? Math.round(grammarScores.reduce((sum, score) => sum + score, 0) / grammarScores.length)
+                : 100;
             
             // Show score flash
             const conversationArea = document.querySelector('.conversation-area');
@@ -549,7 +553,7 @@
                                 total_words: wordCount,
                                 total_turns: turnCount,
                                 duration_seconds: duration,
-                                grammar_errors: grammarErrors
+                                avg_accuracy: accuracy
                             })
                         });
                     }
@@ -580,7 +584,7 @@
             document.getElementById('sessionTime').textContent = '0:00';
             wordCount = 0;
             turnCount = 0;
-            grammarErrors = 0;
+            grammarScores = [];
             updateStats();
             
             // Refresh progress stats and conversation history

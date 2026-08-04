@@ -541,6 +541,40 @@ async def end_conversation(
             print(f"[ERROR] No data returned from update - conversation might not exist or update failed")
             raise HTTPException(status_code=404, detail="Conversation not found or update failed")
         
+        # Update user profile with aggregated stats
+        try:
+            # Get all conversations for this user to calculate totals
+            all_convs = supabase_admin.table("conversations").select(
+                "total_words", "start_time", "end_time"
+            ).eq("user_id", user_id).execute()
+            
+            total_sessions = len(all_convs.data or [])
+            total_words = sum(c.get("total_words", 0) or 0 for c in (all_convs.data or []))
+            
+            # Calculate total minutes from all completed conversations
+            total_seconds = 0
+            for c in (all_convs.data or []):
+                if c.get("start_time") and c.get("end_time"):
+                    try:
+                        start = datetime.fromisoformat(c["start_time"].replace('Z', '+00:00'))
+                        end = datetime.fromisoformat(c["end_time"].replace('Z', '+00:00'))
+                        total_seconds += (end - start).total_seconds()
+                    except:
+                        pass
+            total_minutes = round(total_seconds / 60, 1)
+            
+            supabase_admin.table("profiles").update({
+                "total_sessions": total_sessions,
+                "total_words": total_words,
+                "total_minutes": total_minutes,
+                "updated_at": datetime.now().isoformat()
+            }).eq("id", user_id).execute()
+            
+            print(f"[DEBUG] Profile updated: sessions={total_sessions}, words={total_words}, minutes={total_minutes}")
+        except Exception as profile_err:
+            print(f"[WARN] Failed to update profile stats: {profile_err}")
+            # Don't fail the request - conversation was saved successfully
+        
         return {
             "status": "saved",
             "conversation_id": conversation_id,
