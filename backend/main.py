@@ -284,8 +284,11 @@ async def send_message(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load conversation: {str(e)}")
     
-    # Check grammar of user message
+    # Check grammar of user message and compute per-message score
+    # Score model (Aug 4 intent): each message starts at 100, -5 per grammar error
     grammar_errors = 0
+    grammar_error_list = []
+    grammar_score = 100
     try:
         grammar_check_prompt = f"""Analyze this English text for grammar errors. Count the number of grammar mistakes.
         Text: "{request.message}"
@@ -307,12 +310,17 @@ async def send_message(
         
         import json
         grammar_result = json.loads(grammar_response.choices[0].message.content)
-        grammar_errors = grammar_result.get("error_count", 0)
-        print(f"[DEBUG] Grammar check: {grammar_errors} errors in message: {request.message[:50]}...")
+        grammar_errors = int(grammar_result.get("error_count", 0) or 0)
+        grammar_error_list = grammar_result.get("errors", []) or []
+        grammar_score = max(0, 100 - (grammar_errors * 5))
+        print(f"[DEBUG] Grammar check: {grammar_errors} errors, score={grammar_score} in message: {request.message[:50]}...")
         
     except Exception as e:
         print(f"[ERROR] Grammar check failed: {e}")
-        # Continue without grammar check if it fails
+        # Continue without grammar check if it fails — treat as perfect score
+        grammar_errors = 0
+        grammar_error_list = []
+        grammar_score = 100
     
     # Save user message to Supabase with grammar error count
     try:
@@ -377,6 +385,13 @@ async def send_message(
     
     return {
         "response": tutor_message,
+        # Aug 4 frontend contract: practice.html reads convData.grammar.score
+        "grammar": {
+            "score": grammar_score,
+            "error_count": grammar_errors,
+            "errors": grammar_error_list
+        },
+        # Keep legacy field for older clients / debugging
         "grammar_errors": grammar_errors
     }
 
@@ -499,9 +514,12 @@ async def end_conversation(
     total_words = request.get("total_words", 0)
     total_turns = request.get("total_turns", 0)
     duration_seconds = request.get("duration_seconds", 0)
+    # Aug 4 frontend sends avg_accuracy (mean of per-message grammar.score values).
+    # Keep grammar_errors as legacy fallback for older clients.
+    avg_accuracy = request.get("avg_accuracy")
     grammar_errors = request.get("grammar_errors", 0)
     
-    print(f"[DEBUG] Ending conversation: id={conversation_id}, words={total_words}, turns={total_turns}, grammar_errors={grammar_errors}")
+    print(f"[DEBUG] Ending conversation: id={conversation_id}, words={total_words}, turns={total_turns}, avg_accuracy={avg_accuracy}, grammar_errors={grammar_errors}")
     
     if not conversation_id:
         raise HTTPException(status_code=400, detail="conversation_id is required")
@@ -510,17 +528,20 @@ async def end_conversation(
         user_id = user.get("id") or user.get("sub")
         print(f"[DEBUG] User ID: {user_id}")
         
-        # Calculate accuracy score based on grammar errors
-        # Simple formula: 100% - (errors per turn * penalty)
-        # Each grammar error reduces score by 5 points
-        if total_turns > 0:
-            errors_per_turn = grammar_errors / total_turns
-            accuracy_score = max(0, 100 - (grammar_errors * 5))
+        # Prefer frontend-averaged per-message grammar scores (Aug 4 intent).
+        # Fallback: legacy total-error penalty (100 - 5 * error_count).
+        if avg_accuracy is not None:
+            try:
+                accuracy_score = max(0, min(100, float(avg_accuracy)))
+            except (TypeError, ValueError):
+                accuracy_score = 100.0
+        elif total_turns > 0:
+            accuracy_score = max(0, 100 - (int(grammar_errors or 0) * 5))
         else:
             accuracy_score = 100
         
         accuracy_score = round(accuracy_score, 1)
-        print(f"[DEBUG] Calculated accuracy: {accuracy_score}% (grammar_errors: {grammar_errors})")
+        print(f"[DEBUG] Calculated accuracy: {accuracy_score}% (avg_accuracy={avg_accuracy}, grammar_errors={grammar_errors})")
         
         # Update conversation record with end stats
         update_data = {

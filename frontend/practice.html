@@ -288,10 +288,17 @@
                         await playAudio(convData.response);
                         turnCount++;
                         
-                        // Track grammar score from this message
-                        if (convData.grammar && convData.grammar.score !== undefined) {
-                            grammarScores.push(convData.grammar.score);
-                            console.log('Grammar score received:', convData.grammar.score);
+                        // Track grammar score from this message (Aug 4: average per-message scores)
+                        let messageScore = undefined;
+                        if (convData.grammar && convData.grammar.score !== undefined && convData.grammar.score !== null) {
+                            messageScore = Number(convData.grammar.score);
+                        } else if (convData.grammar_errors !== undefined && convData.grammar_errors !== null) {
+                            // Legacy fallback: convert error count to 100 - 5*errors
+                            messageScore = Math.max(0, 100 - (Number(convData.grammar_errors) * 5));
+                        }
+                        if (messageScore !== undefined && !Number.isNaN(messageScore)) {
+                            grammarScores.push(messageScore);
+                            console.log('Grammar score received:', messageScore);
                         }
                         
                         updateStats();
