@@ -53,13 +53,23 @@
 
         <div class="topic-selector">
             <div class="language-selector">
-                <label class="language-label" for="languageSelect">🌐 Practice Language</label>
-                <div class="language-select-wrap">
-                    <select id="languageSelect" class="language-select" aria-label="Choose language">
-                        <option value="English" selected>🇬🇧 English</option>
-                        <option value="German">🇩🇪 Deutsch</option>
-                        <option value="Hindi">🇮🇳 हिन्दी</option>
-                    </select>
+                <span class="language-label">🌐 Practice Language</span>
+                <div class="language-cards" id="languageCards" role="radiogroup" aria-label="Choose language">
+                    <button type="button" class="language-card active" data-language="English" role="radio" aria-checked="true">
+                        <span class="language-flag">🇬🇧</span>
+                        <span class="language-name">English</span>
+                        <span class="language-check">✓</span>
+                    </button>
+                    <button type="button" class="language-card" data-language="German" role="radio" aria-checked="false">
+                        <span class="language-flag">🇩🇪</span>
+                        <span class="language-name">Deutsch</span>
+                        <span class="language-check">✓</span>
+                    </button>
+                    <button type="button" class="language-card" data-language="Hindi" role="radio" aria-checked="false">
+                        <span class="language-flag">🇮🇳</span>
+                        <span class="language-name">हिन्दी</span>
+                        <span class="language-check">✓</span>
+                    </button>
                 </div>
             </div>
             <h3 style="margin-top: 1.5rem;">Choose a topic:</h3>
@@ -183,9 +193,17 @@
             });
         });
 
-        // Language selection
-        document.getElementById('languageSelect').addEventListener('change', (e) => {
-            currentLanguage = e.target.value;
+        // Language selection (cards, not a small dropdown)
+        document.querySelectorAll('.language-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.language-card').forEach(c => {
+                    c.classList.remove('active');
+                    c.setAttribute('aria-checked', 'false');
+                });
+                card.classList.add('active');
+                card.setAttribute('aria-checked', 'true');
+                currentLanguage = card.dataset.language;
+            });
         });
 
         // Start conversation button
