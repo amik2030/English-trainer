@@ -1026,6 +1026,42 @@ section {
     margin-top: 1rem;
 }
 
+.language-selector {
+    display: flex;
+    justify-content: center;
+    margin-top: 0.5rem;
+}
+
+.language-select {
+    width: 100%;
+    max-width: 340px;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    background: white;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+}
+
+.language-select:hover {
+    border-color: #667eea;
+    background-color: #f8f9ff;
+}
+
+.language-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
 .topic-btn {
     padding: 0.6rem 1.2rem;
     border: 2px solid #e0e0e0;

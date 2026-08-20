@@ -52,7 +52,18 @@
         </div>
 
         <div class="topic-selector">
-            <h3>Choose a topic:</h3>
+            <h3>Choose a language:</h3>
+            <div class="language-selector">
+                <select id="languageSelect" class="language-select" aria-label="Choose language">
+                    <option value="English" selected>🇬🇧 English</option>
+                    <option value="German">🇩🇪 German</option>
+                    <option value="Spanish">🇪🇸 Spanish</option>
+                    <option value="French">🇫🇷 French</option>
+                    <option value="Italian">🇮🇹 Italian</option>
+                    <option value="Hindi">🇮🇳 Hindi</option>
+                </select>
+            </div>
+            <h3 style="margin-top: 1.25rem;">Choose a topic:</h3>
             <div class="topic-buttons">
                 <button class="topic-btn active" data-topic="daily-life">Daily Life</button>
                 <button class="topic-btn" data-topic="travel">Travel</button>
@@ -143,6 +154,7 @@
 
         // State
         let currentTopic = 'daily-life';
+        let currentLanguage = 'English';
         let conversationId = null;
         let isRecording = false;
         let mediaRecorder = null;
@@ -170,6 +182,11 @@
                 btn.classList.add('active');
                 currentTopic = btn.dataset.topic;
             });
+        });
+
+        // Language selection
+        document.getElementById('languageSelect').addEventListener('change', (e) => {
+            currentLanguage = e.target.value;
         });
 
         // Start conversation button
@@ -409,7 +426,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken4}`
                     },
-                    body: JSON.stringify({ topic: currentTopic })
+                    body: JSON.stringify({ topic: currentTopic, language: currentLanguage })
                 });
 
                 if (response.ok) {
@@ -695,7 +712,7 @@
                 return `
                     <div class="conversation-item">
                         <div class="conversation-header">
-                            <span class="conversation-topic">${conv.topic || 'General'}</span>
+                            <span class="conversation-topic">${conv.topic || 'General'} · ${conv.language || 'English'}</span>
                             <span class="conversation-date">${date}</span>
                         </div>
                         <div class="conversation-stats">
@@ -758,7 +775,7 @@
                         return `
                             <div class="conversation-item">
                                 <div class="conversation-header">
-                                    <span class="conversation-topic">${conv.topic || 'General'}</span>
+                                    <span class="conversation-topic">${conv.topic || 'General'} · ${conv.language || 'English'}</span>
                                     <span class="conversation-date">${date}</span>
                                 </div>
                                 <div class="conversation-stats">

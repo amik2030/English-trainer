@@ -106,6 +106,7 @@ class MessageRequest(BaseModel):
 class ConversationStart(BaseModel):
     topic: str = "general conversation"
     level: str = "intermediate"
+    language: str = "English"
 
 
 # ============================================
@@ -191,13 +192,14 @@ async def start_conversation(
     Start a new conversation session with AI tutor
     """
     # Initialize system prompt
-    system_prompt = f"""You are a friendly and patient English conversation tutor. 
+    system_prompt = f"""You are a friendly and patient conversation tutor. 
     Your student is at {request.level} level and wants to practice {request.topic}.
+    The language of instruction and conversation is {request.language}.
     
     Your role:
-    - Engage in natural conversation
-    - Gently correct grammar and vocabulary mistakes
-    - Suggest more natural or idiomatic expressions
+    - Engage in natural conversation entirely in {request.language}
+    - Gently correct grammar and vocabulary mistakes in {request.language}
+    - Suggest more natural or idiomatic expressions in {request.language}
     - Ask follow-up questions to keep conversation flowing
     - Be encouraging and supportive
     
@@ -226,6 +228,7 @@ async def start_conversation(
             "user_id": user_id,
             "topic": request.topic,
             "level": request.level,
+            "language": request.language,
             "start_time": datetime.now().isoformat()
         }).execute()
         
@@ -266,14 +269,16 @@ async def send_message(
             raise HTTPException(status_code=404, detail="Conversation not found")
         
         conversation = conv_result.data[0]
-        # Reconstruct system prompt from topic and level
-        system_prompt = f"""You are a friendly and patient English conversation tutor. 
+        # Reconstruct system prompt from topic, level and language
+        language = conversation.get('language', 'English') or 'English'
+        system_prompt = f"""You are a friendly and patient conversation tutor. 
         Your student is at {conversation.get('level', 'intermediate')} level and wants to practice {conversation.get('topic', 'general conversation')}.
+        The language of instruction and conversation is {language}.
         
         Your role:
-        - Engage in natural conversation
-        - Gently correct grammar and vocabulary mistakes
-        - Suggest more natural or idiomatic expressions
+        - Engage in natural conversation entirely in {language}
+        - Gently correct grammar and vocabulary mistakes in {language}
+        - Suggest more natural or idiomatic expressions in {language}
         - Ask follow-up questions to keep conversation flowing
         - Be encouraging and supportive
         
@@ -290,7 +295,7 @@ async def send_message(
     grammar_error_list = []
     grammar_score = 100
     try:
-        grammar_check_prompt = f"""Analyze this English text for grammar errors. Count the number of grammar mistakes.
+        grammar_check_prompt = f"""Analyze this {language} text for grammar errors. Count the number of grammar mistakes.
         Text: "{request.message}"
         
         Return ONLY a JSON object with this format:
@@ -309,7 +314,13 @@ async def send_message(
         )
         
         import json
-        grammar_result = json.loads(grammar_response.choices[0].message.content)
+        # Strip potential code fences from LLM output before parsing
+        raw_content = grammar_response.choices[0].message.content.strip()
+        if raw_content.startswith("```"):
+            raw_content = raw_content.strip("`")
+            if raw_content.lower().startswith("json"):
+                raw_content = raw_content[4:].strip()
+        grammar_result = json.loads(raw_content)
         grammar_errors = int(grammar_result.get("error_count", 0) or 0)
         grammar_error_list = grammar_result.get("errors", []) or []
         grammar_score = max(0, 100 - (grammar_errors * 5))
@@ -697,7 +708,7 @@ async def get_conversation_history(user: dict = Depends(get_current_user)):
     try:
         user_id = user.get("id") or user.get("sub")
         result = supabase_admin.table("conversations").select(
-            "id", "topic", "level", "start_time", "end_time", "total_words", "avg_accuracy", "messages_count"
+            "id", "topic", "level", "language", "start_time", "end_time", "total_words", "avg_accuracy", "messages_count"
         ).eq("user_id", user_id).order("start_time", desc=True).limit(50).execute()
         
         # Calculate duration for each conversation
@@ -716,6 +727,7 @@ async def get_conversation_history(user: dict = Depends(get_current_user)):
                 "id": conv.get("id"),
                 "topic": conv.get("topic"),
                 "level": conv.get("level"),
+                "language": conv.get("language") or "English",
                 "start_time": conv.get("start_time"),
                 "end_time": conv.get("end_time"),
                 "total_words": conv.get("total_words"),

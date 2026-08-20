@@ -25,6 +25,7 @@ CREATE TABLE public.conversations (
     session_id TEXT,
     topic TEXT DEFAULT 'general conversation',
     level TEXT DEFAULT 'intermediate',
+    language TEXT DEFAULT 'English',
     start_time TIMESTAMPTZ DEFAULT NOW(),
     end_time TIMESTAMPTZ,
     total_words INTEGER DEFAULT 0,
