@@ -191,10 +191,19 @@ async def start_conversation(
     """
     Start a new conversation session with AI tutor
     """
+    # Language-to-script mapping so the tutor uses the correct writing system
+    LANGUAGE_SCRIPT = {
+        "English": "Latin script",
+        "German": "Latin script",
+        "Hindi": "Devanagari script (हिन्दी). Do NOT use Urdu/Nastaliq/Arabic script.",
+    }
+    script = LANGUAGE_SCRIPT.get(request.language, "Latin script")
+
     # Initialize system prompt
     system_prompt = f"""You are a friendly and patient conversation tutor. 
     Your student is at {request.level} level and wants to practice {request.topic}.
     The language of instruction and conversation is {request.language}.
+    You MUST write in {script}.
     
     Your role:
     - Engage in natural conversation entirely in {request.language}
@@ -271,9 +280,17 @@ async def send_message(
         conversation = conv_result.data[0]
         # Reconstruct system prompt from topic, level and language
         language = conversation.get('language', 'English') or 'English'
+        # Language-to-script mapping so the tutor uses the correct writing system
+        LANGUAGE_SCRIPT = {
+            "English": "Latin script",
+            "German": "Latin script",
+            "Hindi": "Devanagari script (हिन्दी). Do NOT use Urdu/Nastaliq/Arabic script.",
+        }
+        script = LANGUAGE_SCRIPT.get(language, "Latin script")
         system_prompt = f"""You are a friendly and patient conversation tutor. 
         Your student is at {conversation.get('level', 'intermediate')} level and wants to practice {conversation.get('topic', 'general conversation')}.
         The language of instruction and conversation is {language}.
+        You MUST write in {script}.
         
         Your role:
         - Engage in natural conversation entirely in {language}
