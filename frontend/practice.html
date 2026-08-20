@@ -52,18 +52,17 @@
         </div>
 
         <div class="topic-selector">
-            <h3>Choose a language:</h3>
             <div class="language-selector">
-                <select id="languageSelect" class="language-select" aria-label="Choose language">
-                    <option value="English" selected>🇬🇧 English</option>
-                    <option value="German">🇩🇪 German</option>
-                    <option value="Spanish">🇪🇸 Spanish</option>
-                    <option value="French">🇫🇷 French</option>
-                    <option value="Italian">🇮🇹 Italian</option>
-                    <option value="Hindi">🇮🇳 Hindi</option>
-                </select>
+                <label class="language-label" for="languageSelect">🌐 Practice Language</label>
+                <div class="language-select-wrap">
+                    <select id="languageSelect" class="language-select" aria-label="Choose language">
+                        <option value="English" selected>🇬🇧 English</option>
+                        <option value="German">🇩🇪 Deutsch</option>
+                        <option value="Hindi">🇮🇳 हिन्दी</option>
+                    </select>
+                </div>
             </div>
-            <h3 style="margin-top: 1.25rem;">Choose a topic:</h3>
+            <h3 style="margin-top: 1.5rem;">Choose a topic:</h3>
             <div class="topic-buttons">
                 <button class="topic-btn active" data-topic="daily-life">Daily Life</button>
                 <button class="topic-btn" data-topic="travel">Travel</button>
