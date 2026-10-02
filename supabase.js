@@ -1,6 +1,6 @@
 /* ============ SUPABASE LAYER — demo analytics + question wall ============ */
 const SUPA_URL = "https://qiapbljkhbpybhqcshjo.supabase.co";
-const SUPA_ANON = "eyJhbG…NKCc";
+const SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYXBibGpraGJweWJocWNzaGpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyOTE4MDIsImV4cCI6MjA5OTg2NzgwMn0.zba_NfWkl8SpZXXzWeiEcqIH6FSZ2KUnaw94y9CNKkc";
 
 // visitor id in localStorage
 function visitorId() {
