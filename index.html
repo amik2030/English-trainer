@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDP Legal Research Workbench — Demo</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">§</div>
+      <div>
+        <div class="brand-name">Legal Research<br>Workbench</div>
+        <div class="brand-sub">Data · Digital · Privacy</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="#home" class="nav-link active" data-screen="home"><span class="nav-icon">🏛</span> Overview</a>
+      <a href="#ask" class="nav-link" data-screen="ask"><span class="nav-icon">⚡</span> Consulting <span class="nav-tag">Ask</span></a>
+      <a href="#projects" class="nav-link" data-screen="projects"><span class="nav-icon">🏗</span> Projects <span class="nav-tag">Build</span></a>
+      <a href="#monitoring" class="nav-link" data-screen="monitoring"><span class="nav-icon">📡</span> Monitoring <span class="nav-tag">Operate</span></a>
+      <a href="#kmbase" class="nav-link" data-screen="kmbase"><span class="nav-icon">🧱</span> KM Base</a>
+      <a href="#architecture" class="nav-link" data-screen="architecture"><span class="nav-icon">🔬</span> Architecture</a>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="demo-pill">● DEMO — mock data</span>
+      <div>POC Sep–Nov 2026 · GDPR + EU AI Act</div>
+      <div style="margin-top:4px">Built on Veeva Vault · Phoenix Portal · KM Framework</div>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+
+    <!-- ---------- HOME ---------- -->
+    <section id="home" class="screen visible">
+      <div class="eyebrow">DDP · Data, Digital &amp; Privacy</div>
+      <h1>Legal Research Workbench</h1>
+      <p class="lede">One curated knowledge base. Three ways of working. AI that cites, verifies, and never decides alone.</p>
+
+      <div class="hero-quote">
+        Document management organises files. Knowledge management organises meaning. AI requires meaning.
+      </div>
+
+      <div class="grid grid-4" style="margin-bottom:26px">
+        <div class="card stat"><div class="num">60–70%</div><div class="lbl">of legal time spent finding &amp; organising info today</div></div>
+        <div class="card stat"><div class="num">95%+</div><div class="lbl">target citation accuracy on every generated output</div></div>
+        <div class="card stat"><div class="num">Hours</div><div class="lbl">to detect a regulatory change — vs. weeks manually</div></div>
+        <div class="card stat"><div class="num">100%</div><div class="lbl">of outputs pass a mandatory human review gate</div></div>
+      </div>
+
+      <h2>Three work modes — one flywheel</h2>
+      <p class="muted small" style="margin-bottom:14px">Click a mode to explore a live demo.</p>
+      <div class="grid grid-3">
+        <div class="card mode-card" onclick="go('ask')">
+          <div class="mode-emoji">⚡</div>
+          <div class="mode-dur">Hours → days</div>
+          <h3>General Consulting — "Ask"</h3>
+          <p class="muted small">Quick checks on laws, application &amp; enforcement, specific scenarios. Instant answers with exact citations and confidence scores.</p>
+        </div>
+        <div class="card mode-card" onclick="go('projects')">
+          <div class="mode-emoji">🏗</div>
+          <div class="mode-dur">Weeks → months</div>
+          <h3>Projects — "Build"</h3>
+          <p class="muted small">Policy making, directive development, reactive updates to external events (Schrems II-class rulings). Impact radar, gap analysis, research notebooks.</p>
+        </div>
+        <div class="card mode-card" onclick="go('monitoring')">
+          <div class="mode-emoji">📡</div>
+          <div class="mode-dur">Continuous</div>
+          <h3>Monitoring — "Operate"</h3>
+          <p class="muted small">Notice &amp; cookie compliance, breach analysis, remediation tracking, policy-gap dashboards, horizon scanning with interconnection view.</p>
+        </div>
+      </div>
+
+      <h2>Why now</h2>
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>🔴 The cost of doing nothing compounds</h3>
+          <ul class="small muted" style="padding-left:18px; line-height:1.8">
+            <li><strong style="color:var(--text)">AI Act obligations are applicable now</strong> — high-risk duties since Aug 2026, and DDP governs them</li>
+            <li>Manual monitoring is <strong style="color:var(--text)">sampling, not coverage</strong> — missed changes drift silently</li>
+            <li>Black-swan response (Schrems II-class) takes <strong style="color:var(--text)">months</strong> — the exposure window is the risk</li>
+            <li>Knowledge debt grows <strong style="color:var(--text)">superlinearly</strong> — every un-indexed document deepens it</li>
+            <li>Key-person dependency: critical positions live <strong style="color:var(--text)">in heads, not in the corpus</strong></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🟢 The strategic upside</h3>
+          <ul class="small muted" style="padding-left:18px; line-height:1.8">
+            <li><strong style="color:var(--text)">Dogfooding trustworthy AI</strong> — DDP becomes the company's living reference implementation</li>
+            <li><strong style="color:var(--text)">One corpus, every surface</strong> — the same curated base serves Workbench, Phoenix Portal &amp; Prime Bot (140k users)</li>
+            <li><strong style="color:var(--text)">Institutional memory as an asset</strong> — every correction makes the system permanently smarter</li>
+            <li><strong style="color:var(--text)">Reactive → anticipatory</strong> — draft the Omnibus update before the deadline</li>
+            <li><strong style="color:var(--text)">KM initiative gets its ROI dashboard</strong> — curation value becomes measurable</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- ASK ---------- -->
+    <section id="ask" class="screen">
+      <div class="eyebrow">Mode 1 · General Consulting</div>
+      <h1>⚡ Ask</h1>
+      <p class="lede">Quick legal checks with exact citations, confidence scores, and a human review gate. Pick a sample question or type your own.</p>
+
+      <div class="ask-wrap">
+        <div>
+          <h3 class="small muted" style="margin-bottom:10px; text-transform:uppercase; letter-spacing:.08em; font-size:11.5px">Try a sample query</h3>
+          <div class="chips" id="chipBox"></div>
+        </div>
+        <div>
+          <div class="query-bar">
+            <input id="askInput" type="text" placeholder="e.g. Does the EU AI Act apply to our vendor's patient-triage chatbot?">
+            <button class="btn" onclick="runQuery()">Ask ⏎</button>
+          </div>
+
+          <div class="thinking" id="thinking"><span class="spinner"></span><span id="thinkText">Parsing query…</span></div>
+
+          <div class="answer" id="answerBox">
+            <div class="card" style="margin-bottom:14px">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px">
+                <div>
+                  <span class="badge b-blue" id="ansType">Scenario check</span>
+                  <span class="badge b-purple" style="margin-left:6px" id="ansJur">EU</span>
+                </div>
+                <span class="small muted" id="ansTime"></span>
+              </div>
+              <div id="ansBody" style="font-size:15px"></div>
+            </div>
+
+            <div class="grid grid-2">
+              <div class="card">
+                <h3>📚 Sources retrieved <span class="small muted" id="srcCount"></span></h3>
+                <div id="srcList"></div>
+              </div>
+              <div class="card">
+                <h3>🛡 Verification</h3>
+                <div id="verBox"></div>
+              </div>
+            </div>
+
+            <div class="gap-flag" id="gapFlag" style="display:none"></div>
+
+            <div class="review-gate" id="reviewGate">
+              <div class="rg-title">🧑‍⚖️ HUMAN REVIEW GATE — mandatory before this answer leaves the Workbench</div>
+              <div class="small muted" style="margin-bottom:12px">Monitor &amp; Summarizer run semi-autonomously. <strong style="color:var(--text)">Researcher outputs always require human approval</strong> — this is where legal risk lives. Your decision is logged to the audit trail.</div>
+              <div style="display:flex; gap:10px; flex-wrap:wrap">
+                <button class="btn green sm" onclick="review('approved')">✓ Approve &amp; share</button>
+                <button class="btn amber sm" onclick="review('revise')">✎ Request revision</button>
+                <button class="btn ghost sm" onclick="review('rejected')">✗ Reject</button>
+              </div>
+              <div id="reviewResult" class="small" style="margin-top:10px; display:none"></div>
+            </div>
+          </div>
+
+          <!-- Question wall -->
+          <div class="card" style="margin-top:24px" id="questionWall">
+            <h3>💬 Ask the DDP team a real question</h3>
+            <p class="small muted" style="margin-bottom:12px">This demo runs on mock data — but our legal experts read every question submitted here and answer the best ones live. Try it: what would <em>you</em> ask the Workbench?</p>
+            <div class="query-bar" style="margin-bottom:6px">
+              <input id="qInput" type="text" placeholder="e.g. How would the Workbench handle our clinical-trial consent forms?">
+              <button class="btn" id="qSubmit" onclick="askQuestion()">Submit</button>
+            </div>
+            <div id="qStatus" class="small" style="margin-bottom:12px; display:none"></div>
+            <div id="qAnswered"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- PROJECTS ---------- -->
+    <section id="projects" class="screen">
+      <div class="eyebrow">Mode 2 · Projects</div>
+      <h1>🏗 Build</h1>
+      <p class="lede">Structured, multi-week efforts: policy making, directive development, and reactive responses to external events.</p>
+
+      <div class="grid grid-3" id="projList"></div>
+
+      <div id="projDetail" style="display:none; margin-top:24px"></div>
+    </section>
+
+    <!-- ---------- MONITORING ---------- -->
+    <section id="monitoring" class="screen">
+      <div class="eyebrow">Mode 3 · Compliance Monitoring &amp; Automation</div>
+      <h1>📡 Operate</h1>
+      <p class="lede"><span class="pulse"></span>Live — 6 standing automations. Detection latency for regulatory change: hours, not weeks.</p>
+
+      <div class="grid grid-2" style="margin-bottom:20px">
+        <div class="card">
+          <h3>🔥 Regulatory feed <span class="small muted">(Monitor → Summarizer, last 48h)</span></h3>
+          <div id="feedBox"></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <h3>📋 Policy gap index</h3>
+            <div id="gapBars"></div>
+          </div>
+          <div class="card">
+            <h3>🌐 Notice &amp; cookie compliance <span class="small muted">(continuous scan)</span></h3>
+            <table>
+              <thead><tr><th>Property</th><th>Score</th><th>Deviations</th><th>Age</th></tr></thead>
+              <tbody id="noticeTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>⚖️ Breach pattern base</h3>
+          <p class="small muted" style="margin-bottom:10px">Cross-jurisdiction analysis of DPA decisions — evidence-based reportability judgment.</p>
+          <div id="breachBox"></div>
+        </div>
+        <div class="card">
+          <h3>🔧 Remediation tracker</h3>
+          <p class="small muted" style="margin-bottom:10px">Gap → assignment → resolution, with auto-drafted status reports (human-approved).</p>
+          <div id="remBox"></div>
+        </div>
+        <div class="card">
+          <h3>🔭 Horizon radar</h3>
+          <p class="small muted" style="margin-bottom:10px">Topic scanning + interconnection alerts across regulatory domains.</p>
+          <div id="horizonBox"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- KM BASE ---------- -->
+    <section id="kmbase" class="screen">
+      <div class="eyebrow">The foundation</div>
+      <h1>🧱 One Program, Not Two</h1>
+      <p class="lede">The Workbench is the <strong style="color:var(--purple)">intelligence surface</strong> of the org-wide KM initiative. Phoenix Portal is where humans <em>read</em> curated knowledge; the Workbench is where AI <em>reasons over</em> it. Same corpus. One asset, two surfaces.</p>
+
+      <div class="tier tier-3" style="margin-bottom:6px">
+        <div class="tier-lbl" style="color:var(--purple)">Tier 3 · AI Intelligence Layer — reads curated only</div>
+        <div class="small">Monitor · Summarizer · Researcher agents + retrieval pipeline + citation graph queries</div>
+      </div>
+      <div class="arrow-down">▲ reads only ▼ never writes raw</div>
+      <div class="tier tier-2" style="margin-bottom:6px">
+        <div class="tier-lbl" style="color:var(--blue)">Tier 2 · Curated Knowledge Base — the KM initiative's product</div>
+        <div class="small">Classified · enriched · linked · owner-signed-off · machine-readable metadata (taxonomy v0.2, glossary, cross-references, confidentiality markings)</div>
+      </div>
+      <div class="arrow-down">▲ curation pipeline ▼</div>
+      <div class="tier tier-1" style="margin-bottom:20px">
+        <div class="tier-lbl" style="color:var(--muted)">Tier 1 · Raw Sources — immutable</div>
+        <div class="small">Veeva Vault (system of record, GxP-validated) · wikis · EDPB · EUR-Lex · DPA websites</div>
+      </div>
+
+      <h2>KM practices → AI capabilities (for free)</h2>
+      <div class="card" style="padding:6px 20px">
+        <table>
+          <thead><tr><th>KM practice</th><th>What AI gets seamlessly</th></tr></thead>
+          <tbody>
+            <tr><td>Vault lifecycle states</td><td>Researcher <strong>never cites a superseded policy</strong>; temporal queries work natively</td></tr>
+            <tr><td>Classification metadata</td><td>Structured pre-filters before semantic search → precision without prompt tricks</td></tr>
+            <tr><td>Provenance &amp; trust fields</td><td>Confidence scoring is grounded — authoritative docs outrank derivatives</td></tr>
+            <tr><td>Confidentiality markings</td><td>RBAC retrieval filtering: AI <strong>can't leak what it can't retrieve</strong></td></tr>
+            <tr><td>Taxonomy (dotted IDs)</td><td>An EDPB opinion and the internal consent SOP share node A.1.1.8 — they find each other</td></tr>
+            <tr><td>Glossary</td><td>PIA = DPIA normalized before the LLM ever sees the query</td></tr>
+            <tr><td>Cross-reference extraction</td><td>The citation graph → powers Gap Analysis, Impact Radar &amp; precedent chains</td></tr>
+            <tr><td>Owner sign-off &amp; stewards</td><td>HITL gates have named existing roles — governance, not new burden</td></tr>
+            <tr><td>Vault audit trail (21 CFR Pt 11)</td><td>Extends end-to-end: query → chunks → output → review decision</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small muted" style="margin-top:10px"><strong style="color:var(--text)">The seamlessness test:</strong> when KM improves, AI quality improves the same day. KM improvements are AI upgrades without deployments.</p>
+
+      <h2>The reverse flow — the Workbench is KM's best instrument</h2>
+      <div class="grid grid-2">
+        <div class="card">
+          <ul class="small" style="padding-left:18px; line-height:1.9">
+            <li><strong>Gap flags</strong> → demand-ranked curation backlog</li>
+            <li><strong>Citation frequency</strong> → which policies are load-bearing vs. dead weight</li>
+            <li><strong>Human corrections</strong> → direct feedback to taxonomy stewards</li>
+            <li><strong>Unanswered rate</strong> → the measurable KM health KPI the program never had</li>
+          </ul>
+        </div>
+        <div class="card" style="display:flex; flex-direction:column; justify-content:center">
+          <div class="hero-quote" style="margin:0; font-size:16.5px">The KM initiative builds the asset.<br>The Workbench monetizes it.<br><span class="muted" style="font-size:14px">The AI budget justifies the KM budget — while KM de-risks the AI.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- ARCHITECTURE ---------- -->
+    <section id="architecture" class="screen">
+      <div class="eyebrow">For the development team</div>
+      <h1>🔬 How it works</h1>
+      <p class="lede">Three agents, one hybrid retrieval pipeline, mandatory human-in-the-loop. Low autonomy by design.</p>
+
+      <div class="agent-row">
+        <div class="card" style="border-top:3px solid var(--blue)">
+          <h3>🔍 Monitor — "The Sentinel"</h3>
+          <p class="small muted">Scheduled (6h) + event-driven. Watches EDPB, EUR-Lex, 3–5 expert sources, selected DPAs. Emits structured events: <code>{source, type, url, change_delta}</code>. <strong style="color:var(--text)">Does not interpret.</strong></p>
+          <div style="margin-top:10px"><span class="badge b-blue">Cron + queue</span> <span class="badge b-med">HITL: source approval</span></div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--purple)">
+          <h3>📋 Summarizer — "The Librarian"</h3>
+          <p class="small muted">Raw event → structured summary (≤500w) + embeddings + relevance/risk tags + citation links to internal policies. Triggers alerts on high impact. <strong style="color:var(--text)">Does not answer users.</strong></p>
+          <div style="margin-top:10px"><span class="badge b-purple">Queue consumer</span> <span class="badge b-med">HITL: spot-checks</span></div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--green)">
+          <h3>🧠 Researcher — "The Counsel"</h3>
+          <p class="small muted">User query → parse → hybrid retrieval → citation-verified synthesis → confidence scores → gap flags → <strong style="color:var(--text)">mandatory human review gate</strong>. Does not crawl live or decide autonomously.</p>
+          <div style="margin-top:10px"><span class="badge b-high">Interactive</span> <span class="badge b-low">HITL: approval mandatory</span></div>
+        </div>
+      </div>
+
+      <h2>Retrieval pipeline (why generic RAG fails for legal)</h2>
+      <div class="card">
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:13px">
+          <span class="badge b-blue">Query parser</span> →
+          <span class="badge b-blue">Vector search (top-20)</span> +
+          <span class="badge b-blue">BM25 (top-20)</span> →
+          <span class="badge b-purple">Reciprocal rank fusion</span> →
+          <span class="badge b-purple">Context builder (cross-refs, temporal)</span> →
+          <span class="badge b-high">LLM synthesis</span> →
+          <span class="badge b-med">Claim verification (NLI)</span> →
+          <span class="badge b-low">Human gate</span>
+        </div>
+        <ul class="small muted" style="margin-top:14px; padding-left:18px; line-height:1.8">
+          <li><strong style="color:var(--text)">Legal-aware chunking</strong> — Article → Paragraph → Point, never token counts. Art. 6(1)(b) ≠ Art. 6(2).</li>
+          <li><strong style="color:var(--text)">Citation graph</strong> — edges: AMENDS · INTERPRETS · REFERENCES · IMPLEMENTS · SUPERSEDES · APPLIES_TO · CONFLICTS_WITH</li>
+          <li><strong style="color:var(--text)">Anti-hallucination</strong> — every claim: ✅ SUPPORTED · ⚠️ PARTIAL · ❌ UNSUPPORTED (removed) · 🚫 FABRICATED (removed + logged)</li>
+          <li><strong style="color:var(--text)">Temporal versioning</strong> — "what did Art. 6 say in 2020 vs. now"</li>
+        </ul>
+      </div>
+
+      <h2>Indicative stack</h2>
+      <div class="card" style="padding:6px 20px">
+        <table>
+          <tbody>
+            <tr><td><strong>Embeddings</strong></td><td>text-embedding-3-large / Cohere embed-v4</td></tr>
+            <tr><td><strong>Vector DB</strong></td><td>Qdrant (filtered search + payload indexing)</td></tr>
+            <tr><td><strong>Keyword</strong></td><td>Elasticsearch / Meilisearch (BM25)</td></tr>
+            <tr><td><strong>Graph</strong></td><td>Neo4j / FalkorDB (precedent chains)</td></tr>
+            <tr><td><strong>Verification</strong></td><td>NLI cross-encoder (self-hosted) or LLM-as-verifier</td></tr>
+            <tr><td><strong>System of record</strong></td><td>Veeva Vault APIs (bulk + incremental read-out — Week 1 validation)</td></tr>
+            <tr><td><strong>Orchestration</strong></td><td>LangGraph or custom, on internal AI platform</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>POC plan (10 weeks)</h2>
+      <div class="card" style="padding:6px 20px">
+        <table>
+          <thead><tr><th>Weeks</th><th>Milestone</th><th>Mode proven</th></tr></thead>
+          <tbody>
+            <tr><td>1–3</td><td>Monitor: 3–5 external sources, reliable detection</td><td>Operate</td></tr>
+            <tr><td>3–5</td><td>Summarizer: summaries + embeddings + vector store</td><td>Operate</td></tr>
+            <tr><td>5–8</td><td>Researcher: cited Q&amp;A + one output format (position paper)</td><td>Ask + Build</td></tr>
+            <tr><td>8–10</td><td>Integration: feedback loops, review gates, 10+ pilot users</td><td>All three</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small muted" style="margin-top:10px">Security: low-autonomy design — least privilege, zero-trust execution, container isolation, agents never hold long-lived credentials. Full audit trail on every action.</p>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="supabase.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
