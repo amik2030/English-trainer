@@ -180,7 +180,7 @@ if (location.hash) {
 }
 logEvent("session_start", location.hash ? location.hash.replace("#", "") : "home");
 
-/* ---------- Question wall (Supabase) ---------- */
+/* ---------- Question wall (instant answer by the board) ---------- */
 async function askQuestion() {
   const inp = document.getElementById("qInput");
   const st = document.getElementById("qStatus");
@@ -188,13 +188,23 @@ async function askQuestion() {
   if (!q) return;
   const btn = document.getElementById("qSubmit");
   btn.disabled = true; btn.textContent = "…";
-  const ok = await submitQuestion(q);
-  btn.disabled = false; btn.textContent = "Submit";
   st.style.display = "block";
-  if (ok) {
+  st.innerHTML = "<span class='muted'>⚡ The answering board is composing your answer…</span>";
+  logEvent("question_submit", "ask", { question: q.slice(0, 200) });
+  const res = await submitQuestion(q);
+  btn.disabled = false; btn.textContent = "Submit";
+  if (res && res.answer) {
     inp.value = "";
-    st.innerHTML = "✅ <span style='color:var(--green)'>Submitted!</span> Your question is now in the DDP team's review queue — answered questions appear below. <span class='muted'>(logged to the live audit trail — the same pattern the real platform uses.)</span>";
-    logEvent("question_submit", "ask", { question: q.slice(0, 200) });
+    st.innerHTML =
+      `<div style="border-left:3px solid var(--green); padding:10px 14px; background:var(--panel2); border-radius:0 10px 10px 0">` +
+      `<div class="small"><strong>Q:</strong> ${escapeHtml(q)}</div>` +
+      `<div class="small" style="margin-top:6px"><span style="color:var(--green)">A:</span> ${escapeHtml(res.answer)}</div>` +
+      `<div class="small muted" style="margin-top:6px">⚡ Answered instantly by the board · logged to the live audit trail</div>` +
+      `</div>`;
+    loadAnswered();
+  } else if (res && res.queued) {
+    inp.value = "";
+    st.innerHTML = "⚠️ <span style='color:var(--amber)'>The board is briefly unavailable</span> — your question was queued and will appear below once answered.";
   } else {
     st.innerHTML = "⚠️ <span style='color:var(--amber)'>Submission temporarily unavailable</span> — the demo works fully offline; try again later.";
   }
@@ -204,7 +214,7 @@ async function loadAnswered() {
   const qs = await fetchAnsweredQuestions();
   const box = document.getElementById("qAnswered");
   if (!qs.length) { box.innerHTML = ""; return; }
-  box.innerHTML = `<h3 style="margin-top:6px">✅ Answered by the team</h3>` + qs.map(q => `
+  box.innerHTML = `<h3 style="margin-top:6px">⚡ Answered live by the board</h3>` + qs.map(q => `
     <div style="border-left:3px solid var(--green); padding:8px 14px; margin-bottom:10px; background:var(--panel2); border-radius:0 10px 10px 0">
       <div class="small"><strong>Q:</strong> ${escapeHtml(q.question)}</div>
       <div class="small" style="margin-top:6px"><span style="color:var(--green)">A:</span> ${escapeHtml(q.answer || "")}</div>

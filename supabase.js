@@ -19,13 +19,28 @@ function logEvent(event_type, screen, detail = {}) {
   }).catch(() => {});
 }
 
-// question wall
+// question wall — instant answer via Workbench answering board
+const LWB_API = "https://english-trainer-go4p.onrender.com/api/demo/question";
+
 async function submitQuestion(q) {
-  const r = await fetch(SUPA_URL + "/rest/v1/demo_questions", {
-    method: "POST", headers,
-    body: JSON.stringify({ visitor_id: visitorId(), question: q })
-  });
-  return r.ok || r.status === 201;
+  // Ask the answering board — it logs the question AND returns an immediate answer
+  try {
+    const r = await fetch(LWB_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, visitor_id: visitorId() })
+    });
+    if (r.ok) return await r.json();
+  } catch {}
+  // fallback: queue-only submit (demo degrades gracefully if API is down)
+  try {
+    const r2 = await fetch(SUPA_URL + "/rest/v1/demo_questions", {
+      method: "POST", headers,
+      body: JSON.stringify({ visitor_id: visitorId(), question: q })
+    });
+    if (r2.ok || r2.status === 201) return { queued: true };
+  } catch {}
+  return null;
 }
 
 async function fetchAnsweredQuestions() {
