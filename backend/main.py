@@ -3,7 +3,7 @@ SpeakEasy AI - Enhanced Backend with Supabase
 AI-powered conversation practice with progress tracking and authentication
 """
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -910,7 +910,7 @@ Respond with ONLY a JSON object:
 {"answer": str, "reused": bool, "matched_id": int|null, "source_titles": [str], "confidence": float, "jurisdiction": str}"""
 
 @app.post("/api/demo/ask")
-async def demo_ask(req: DemoAskRequest):
+async def demo_ask(req: DemoAskRequest, background_tasks: BackgroundTasks):
     q = (req.question or "").strip()[:500]
     if not q:
         raise HTTPException(status_code=400, detail="question required")
@@ -984,6 +984,7 @@ async def demo_ask(req: DemoAskRequest):
 
     # 3) persist the exchange so the knowledge base grows (skip if we reused an existing KB answer)
     row_id = matched_id
+    kb_answer_for_tag = answer
     if not reused:
         try:
             ins = supabase_admin.table("demo_questions").insert({
@@ -993,6 +994,14 @@ async def demo_ask(req: DemoAskRequest):
             row_id = ins.data[0]["id"] if ins.data else None
         except Exception:
             pass
+    else:
+        kb_row = next((k for k in kb if k["id"] == matched_id), None)
+        if kb_row:
+            kb_answer_for_tag = kb_row["answer"]
+
+    # 4) classify the exchange against the DDP taxonomy in the background (no added latency)
+    if row_id is not None:
+        background_tasks.add_task(tag_qa_entry, row_id, q, kb_answer_for_tag)
 
     return {
         "id": row_id, "question": q, "answer": answer, "reused": reused,
@@ -1089,6 +1098,152 @@ Rules:
 - Cross-cutting content gets multi-assignment + tags, never duplicate branches (e.g. GDPR breach notification -> A.1.5 + tags data-breach).
 - Only use IDs and tags that appear in the provided vocabulary.
 - If nothing fits, use ["Z"]."""
+
+DEMO_QA_CLASSIFY_SYSTEM = """You are the classification engine of a Legal Research Workbench for a data-protection practice.
+You classify a KNOWLEDGE-BASE ENTRY (a question + its answer) according to the DDP Taxonomy v0.2 (Data, Digital & Privacy law).
+Respond with ONLY a JSON object:
+{"taxonomy_ids": ["A.1.4", ...], "tags": ["data-transfer", ...], "jurisdiction": "EU", "confidence": 0.0-1.0, "rationale": "one sentence"}
+Rules: 1-3 dotted IDs (deepest stable nodes, multi-assign for cross-cutting), 0-5 tags from the controlled vocabulary only,
+jurisdiction from the provided list, use ["Z"] if nothing fits."""
+
+
+def _taxonomy_prompt_block():
+    return (
+        "TAXONOMY TREE (dotted ID -> label):\n"
+        + "\n".join(f"{k}  {v}" for k, v in TAXONOMY_NODES.items())
+        + "\n\nCONTROLLED TAGS: " + ", ".join(TAXONOMY_TAGS)
+        + "\nJURISDICTIONS: " + ", ".join(JURISDICTIONS)
+    )
+
+
+def _classify_with_llm(system_prompt, user_prompt, max_tokens=400):
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=max_tokens,
+        temperature=0.0,
+        response_format={"type": "json_object"},
+    )
+    return json.loads(resp.choices[0].message.content or "{}")
+
+
+def _clean_ids_tags_jur(cls):
+    ids = [str(i).strip() for i in cls.get("taxonomy_ids", []) if str(i).strip() in TAXONOMY_NODES][:3]
+    if not ids:
+        ids = ["Z"]
+    tags = [str(t).strip().lstrip("#") for t in cls.get("tags", []) if str(t).strip().lstrip("#") in TAXONOMY_TAGS][:5]
+    jur = str(cls.get("jurisdiction", "INTL"))[:10]
+    if jur not in JURISDICTIONS:
+        jur = "INTL"
+    try:
+        conf = max(0.0, min(1.0, float(cls.get("confidence", 0.8))))
+    except (TypeError, ValueError):
+        conf = 0.8
+    rationale = str(cls.get("rationale", ""))[:300]
+    return ids, tags, jur, conf, rationale
+
+
+def classify_qa_pair(question, answer):
+    """Classify a Q&A exchange against DDP taxonomy v0.2; returns metadata dict."""
+    prompt = (
+        _taxonomy_prompt_block()
+        + "\n\nKNOWLEDGE-BASE ENTRY TO CLASSIFY:\nQ: " + question
+        + "\nA: " + (answer or "")[:1500]
+    )
+    cls = _classify_with_llm(DEMO_QA_CLASSIFY_SYSTEM, prompt)
+    ids, tags, jur, conf, rationale = _clean_ids_tags_jur(cls)
+    return {
+        "taxonomy_ids": ids,
+        "taxonomy_labels": taxonomy_labels(ids),
+        "tags": tags,
+        "jurisdiction": jur,
+        "confidence": conf,
+        "rationale": rationale,
+    }
+
+
+def _tagged_map():
+    """question_id -> taxonomy metadata from qa_tagged events."""
+    out = {}
+    try:
+        res = supabase_admin.table("demo_events").select("detail") \
+            .eq("event_type", "qa_tagged").order("created_at", desc=True).limit(300).execute()
+        for r in res.data or []:
+            d = r.get("detail") or {}
+            qid = d.get("question_id")
+            if qid is not None and qid not in out:
+                out[qid] = d
+    except Exception:
+        pass
+    return out
+
+
+def tag_qa_entry(question_id, question, answer):
+    """Background: classify a Q&A exchange and store its taxonomy metadata (idempotent)."""
+    try:
+        if question_id in _tagged_map():
+            return
+        meta = classify_qa_pair(question, answer)
+        supabase_admin.table("demo_events").insert({
+            "visitor_id": "system",
+            "event_type": "qa_tagged",
+            "screen": "kmbase",
+            "detail": {"question_id": question_id, **meta},
+        }).execute()
+    except Exception:
+        pass
+
+
+@app.post("/api/demo/retag")
+async def demo_retag():
+    """Backfill taxonomy metadata for answered Q&A entries that lack it."""
+    try:
+        res = supabase_admin.table("demo_questions").select("id, question, answer") \
+            .eq("status", "answered").not_.is_("answer", "null") \
+            .order("answered_at", desc=True).limit(100).execute()
+        rows = res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"kb read failed: {e}")
+    tagged = _tagged_map()
+    n = 0
+    for r in rows:
+        if r["id"] in tagged:
+            continue
+        tag_qa_entry(r["id"], r["question"], r["answer"])
+        n += 1
+    return {"retagged": n}
+
+
+@app.get("/api/demo/kb")
+async def demo_kb():
+    """Knowledge base: answered Q&A exchanges joined with their taxonomy metadata."""
+    try:
+        res = supabase_admin.table("demo_questions").select("id, question, answer, answered_at") \
+            .eq("status", "answered").not_.is_("answer", "null") \
+            .order("answered_at", desc=True).limit(50).execute()
+        rows = res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"kb read failed: {e}")
+    tagged = _tagged_map()
+    entries = []
+    for r in rows:
+        meta = tagged.get(r["id"], {})
+        entries.append({
+            "id": r["id"],
+            "question": r["question"],
+            "answer": r["answer"],
+            "answered_at": r["answered_at"],
+            "taxonomy_ids": meta.get("taxonomy_ids", []),
+            "taxonomy_labels": meta.get("taxonomy_labels", {}),
+            "tags": meta.get("tags", []),
+            "jurisdiction": meta.get("jurisdiction"),
+            "confidence": meta.get("confidence"),
+        })
+    return {"count": len(entries), "entries": entries}
+
 
 @app.post("/api/demo/source")
 async def demo_add_source(req: DemoSourceRequest):
