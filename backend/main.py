@@ -871,6 +871,75 @@ async def serve_main_js():
     raise HTTPException(status_code=404, detail="JavaScript not found")
 
 
+# ============================================
+# Legal Workbench Demo — instant question answering
+# ============================================
+
+class DemoQuestionRequest(BaseModel):
+    question: str
+    visitor_id: Optional[str] = None
+
+DEMO_SYSTEM_PROMPT = """You are the AI answering board of a Legal Research Workbench for a data-protection practice. 
+You answer questions from employees about data protection, privacy, AI governance, and compliance (GDPR, AI Act, Digital Omnibus, ePrivacy, Schrems II, transfers, breaches, etc.).
+
+Rules:
+- Answer directly, concisely, and concretely (120-220 words). No preamble.
+- Structure: short direct answer first, then 2-4 key points.
+- Cite specific legal instruments/articles where relevant (e.g. Art. 6(1)(f) GDPR, COM(2025) 834).
+- If a topic is outside data protection/compliance, politely say it's outside the Workbench's scope.
+- Never fabricate case law or dates you're unsure about; if uncertain, say so briefly.
+- Plain, professional tone. No markdown headers; light use of dashes/semicolons is fine."""
+
+@app.post("/api/demo/question")
+async def demo_question(req: DemoQuestionRequest):
+    q = (req.question or "").strip()[:500]
+    if not q:
+        raise HTTPException(status_code=400, detail="question required")
+    visitor = (req.visitor_id or "v-api")[:64]
+
+    # Log the question (status pending until answered)
+    row = None
+    try:
+        ins = supabase_admin.table("demo_questions").insert({
+            "visitor_id": visitor, "question": q, "status": "pending"
+        }).execute()
+        row = ins.data[0] if ins.data else None
+    except Exception:
+        row = None  # answer anyway; DB logging is best-effort for the demo
+
+    # Generate the answer immediately
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": DEMO_SYSTEM_PROMPT},
+                {"role": "user", "content": q},
+            ],
+            max_tokens=500,
+            temperature=0.3,
+        )
+        answer = (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        answer = ""
+        if row:
+            try:
+                supabase_admin.table("demo_questions").update({"status": "error"}).eq("id", row["id"]).execute()
+            except Exception:
+                pass
+        raise HTTPException(status_code=502, detail=f"answer generation failed: {e}")
+
+    # Flip to answered so it appears on the public wall
+    if row:
+        try:
+            supabase_admin.table("demo_questions").update({
+                "answer": answer, "status": "answered", "answered_at": datetime.utcnow().isoformat()
+            }).eq("id", row["id"]).execute()
+        except Exception:
+            pass
+
+    return {"id": row["id"] if row else None, "question": q, "answer": answer, "status": "answered"}
+
+
 @app.get("/app")
 async def serve_frontend():
     frontend_path = Path(__file__).parent.parent / "frontend" / "index.html"
