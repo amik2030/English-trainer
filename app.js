@@ -107,17 +107,22 @@ async function loadStream() {
   const qs = await fetchAnsweredQuestions();
   const box = document.getElementById("streamHistory");
   if (!box) return;
-  if (!qs.length) {
-    box.innerHTML = `<div class="small muted" style="margin-top:14px">No exchanges yet — the first question above starts the knowledge base.</div>`;
+  const recent = qs.slice(0, 10);
+  if (!recent.length) {
+    box.innerHTML = `<div class="small muted" style="margin-top:14px">No conversations yet — the first question above starts the knowledge base.</div>`;
     return;
   }
-  box.innerHTML = `<h3 style="margin:18px 0 10px">🗄 Knowledge base — answered exchanges <span class="muted small">(${qs.length})</span></h3>` +
-    qs.map(q => `
-    <div class="card kb-card" onclick="askPrefill(${q.id})" title="Tap to re-ask">
-      <div class="small"><strong>Q:</strong> ${escapeHtml(q.question)}</div>
-      <div class="small kb-a" style="margin-top:6px"><span style="color:var(--green)">A:</span> ${escapeHtml(trunc(q.answer || "", 280))}</div>
-      <div class="small muted" style="margin-top:6px">${q.answered_at ? new Date(q.answered_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}</div>
-    </div>`).join("");
+  box.innerHTML = `<h3 style="margin:18px 0 10px">💬 Conversation history <span class="muted small">(${recent.length}${qs.length > 10 ? " of " + qs.length : ""})</span></h3>` +
+    recent.map(q => `
+    <div class="conv-row" onclick="askPrefill(${q.id})" title="Tap to re-ask">
+      <div class="conv-q small"><strong>Q:</strong> ${escapeHtml(q.question)}</div>
+      <div class="conv-a small muted">${escapeHtml(trunc(q.answer || "", 150))}</div>
+      <div class="conv-t">${q.answered_at ? new Date(q.answered_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}</div>
+    </div>`).join("") +
+    `<p class="small muted" style="margin-top:8px">The full Q&amp;A archive — organized by taxonomy — lives in <a href="#kmbase" class="nav-link" data-screen="kmbase" style="color:var(--blue)">🧱 KM Base → Knowledge base archive</a>.</p>`;
+  box.querySelectorAll(".nav-link").forEach(a2 => {
+    a2.addEventListener("click", e => { e.preventDefault(); go(a2.dataset.screen); });
+  });
 }
 
 /* ---------- Projects ---------- */
@@ -204,6 +209,7 @@ async function initSourcePanel() {
     });
   }
   loadSources();
+  loadQaArchive();
 }
 
 async function addSource() {
@@ -289,3 +295,47 @@ async function loadSources() {
 
 initSourcePanel();
 setInterval(loadSources, 60000);
+setInterval(loadQaArchive, 60000);
+
+/* ---------- KM Base: Q&A archive (taxonomy-organized) ---------- */
+async function loadQaArchive() {
+  const box = document.getElementById("qaArchive");
+  if (!box) return;
+  try {
+    const r = await fetch(LWB_API.replace("/question", "/kb"));
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    if (!d.entries.length) {
+      box.innerHTML = `<span class="small muted">No Q&A entries yet — exchanges from the ⚡ Ask screen are archived here automatically.</span>`;
+      return;
+    }
+    // group by top-level taxonomy domain
+    const groups = {};
+    d.entries.forEach(e => {
+      const top = (e.taxonomy_ids && e.taxonomy_ids.length ? e.taxonomy_ids[0] : "Z").split(".")[0];
+      (groups[top] = groups[top] || []).push(e);
+    });
+    const order = Object.keys(groups).sort();
+    const DOMAIN_NAMES = { A: "Data Protection & Privacy Law", B: "AI & Digital Regulation", C: "Information Governance", Z: "Unclassified / Misc" };
+    box.innerHTML = order.map(dom => `
+      <div style="margin-bottom:18px">
+        <div class="qa-domain-hdr"><span class="badge b-purple">${dom}</span> <strong>${escapeHtml(DOMAIN_NAMES[dom] || dom)}</strong> <span class="muted small">(${groups[dom].length})</span></div>
+        ${groups[dom].map(e => {
+          const ids = (e.taxonomy_ids || []).map(id => {
+            const lbl = (e.taxonomy_labels && e.taxonomy_labels[id]) || (TAXONOMY && TAXONOMY.nodes[id]) || id;
+            return `<span class="badge b-purple" title="${escapeHtml(lbl)}">${escapeHtml(id)}</span>`;
+          }).join(" ");
+          const tags = (e.tags || []).map(t => `<span class="badge b-blue">#${escapeHtml(t)}</span>`).join(" ");
+          return `
+          <div class="src-card qa-entry">
+            <div class="small"><strong>Q:</strong> ${escapeHtml(e.question)}</div>
+            <div class="small qa-a" style="margin-top:6px"><span style="color:var(--green)">A:</span> ${escapeHtml(e.answer || "")}</div>
+            <div class="src-meta-row">${ids}${tags ? " " + tags : ""}${e.jurisdiction ? ` <span class="badge b-med">${escapeHtml(e.jurisdiction)}</span>` : ""}</div>
+            <div class="small muted" style="margin-top:6px">#${e.id} · ${e.answered_at ? new Date(e.answered_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}</div>
+          </div>`;
+        }).join("")}
+      </div>`).join("");
+  } catch (e) {
+    box.innerHTML = `<span class="small muted">Archive temporarily unavailable (${escapeHtml(String(e.message || e))}).</span>`;
+  }
+}

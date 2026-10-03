@@ -235,3 +235,17 @@ tr:hover td { background: rgba(79,140,255,.04); }
 }
 .toast.on { opacity: 1; transform: none; }
 .hero-quote { font-size: 19px; line-height: 1.5; color: var(--text); border-left: 3px solid var(--gold); padding-left: 20px; margin: 22px 0; font-family: Georgia, serif; font-style: italic; }
+
+/* conversation history (Ask) */
+.conv-row {
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
+  margin-bottom: 8px; background: var(--panel); cursor: pointer; transition: border-color .15s;
+}
+.conv-row:hover { border-color: var(--blue); }
+.conv-q { color: var(--text); }
+.conv-a { margin-top: 3px; }
+.conv-t { font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+/* Q&A archive (KM Base) */
+.qa-domain-hdr { margin: 4px 0 10px; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.qa-a { color: var(--muted); line-height: 1.65; }
+.qa-entry { background: var(--panel); }
