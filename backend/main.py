@@ -890,6 +890,117 @@ Rules:
 - Never fabricate case law or dates you're unsure about; if uncertain, say so briefly.
 - Plain, professional tone. No markdown headers; light use of dashes/semicolons is fine."""
 
+class DemoAskRequest(BaseModel):
+    question: str
+    visitor_id: Optional[str] = None
+
+DEMO_ASK_SYSTEM = """You are the AI answering board of a Legal Research Workbench for a data-protection practice.
+You answer questions about data protection, privacy, AI governance and compliance (GDPR, AI Act, Digital Omnibus, ePrivacy, Schrems II, transfers, breaches, etc.).
+
+You receive: (1) the QUESTION, (2) the KNOWLEDGE BASE of previously answered questions, (3) the REGISTER of ingested regulatory sources.
+
+Procedure:
+1. KB REUSE FIRST: if any previously answered question has the same intent as the QUESTION (paraphrases count), return that answer VERBATIM as "answer", set reused=true and matched_id to its id. Do not rewrite it.
+2. Otherwise compose a fresh answer: direct answer first, then 2-4 key points, 120-220 words, cite specific articles/instruments (e.g. Art. 6(1)(f) GDPR, COM(2025) 834) and reference registered sources BY THEIR EXACT TITLE where relevant.
+3. Set source_titles to the exact titles of registered sources you relied on (empty list if none).
+4. confidence: 0.0-1.0. jurisdiction: best-fit ISO-ish code from EU, CH, DE, FR, IT, AT, ES, NL, BE, UK, US, INTL.
+5. If the question is outside data protection/commerce-law scope, say so briefly in the answer and set confidence low.
+
+Respond with ONLY a JSON object:
+{"answer": str, "reused": bool, "matched_id": int|null, "source_titles": [str], "confidence": float, "jurisdiction": str}"""
+
+@app.post("/api/demo/ask")
+async def demo_ask(req: DemoAskRequest):
+    q = (req.question or "").strip()[:500]
+    if not q:
+        raise HTTPException(status_code=400, detail="question required")
+    visitor = (req.visitor_id or "v-api")[:64]
+
+    # 1) knowledge base: previously answered questions
+    kb = []
+    try:
+        res = supabase_admin.table("demo_questions").select("id, question, answer") \
+            .eq("status", "answered").not_.is_("answer", "null") \
+            .order("answered_at", desc=True).limit(30).execute()
+        for r in res.data or []:
+            kb.append({"id": r["id"], "question": r["question"], "answer": (r["answer"] or "")[:1200]})
+    except Exception:
+        kb = []
+
+    # 2) register of ingested regulatory sources
+    sources = []
+    try:
+        res = supabase_admin.table("demo_events").select("detail") \
+            .eq("event_type", "source_added").order("created_at", desc=True).limit(30).execute()
+        for r in res.data or []:
+            d = r.get("detail") or {}
+            if d.get("title"):
+                sources.append({
+                    "title": d["title"],
+                    "taxonomy_ids": d.get("taxonomy_ids", []),
+                    "tags": d.get("tags", []),
+                })
+    except Exception:
+        sources = []
+
+    prompt = (
+        "QUESTION:\n" + q
+        + "\n\nKNOWLEDGE BASE (previously answered questions):\n" + json.dumps(kb, ensure_ascii=False)
+        + "\n\nREGISTER OF INGESTED SOURCES:\n" + json.dumps(sources, ensure_ascii=False)
+    )
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": DEMO_ASK_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=700,
+            temperature=0.3,
+            response_format={"type": "json_object"},
+        )
+        out = json.loads(resp.choices[0].message.content or "{}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"answer generation failed: {e}")
+
+    answer = str(out.get("answer", "")).strip()
+    if not answer:
+        raise HTTPException(status_code=502, detail="empty answer")
+    reused = bool(out.get("reused"))
+    kb_ids = {k["id"] for k in kb}
+    matched_id = out.get("matched_id")
+    if not reused or matched_id not in kb_ids:
+        matched_id = None
+        if reused:
+            reused = False
+    reg_titles = {s["title"] for s in sources}
+    source_titles = [t for t in out.get("source_titles", []) if t in reg_titles][:6]
+    try:
+        conf = max(0.0, min(1.0, float(out.get("confidence", 0.8))))
+    except (TypeError, ValueError):
+        conf = 0.8
+    jur = str(out.get("jurisdiction", "INTL"))[:10] or "INTL"
+
+    # 3) persist the exchange so the knowledge base grows (skip if we reused an existing KB answer)
+    row_id = matched_id
+    if not reused:
+        try:
+            ins = supabase_admin.table("demo_questions").insert({
+                "visitor_id": visitor, "question": q, "status": "answered",
+                "answer": answer, "answered_at": datetime.utcnow().isoformat(),
+            }).execute()
+            row_id = ins.data[0]["id"] if ins.data else None
+        except Exception:
+            pass
+
+    return {
+        "id": row_id, "question": q, "answer": answer, "reused": reused,
+        "matched_id": matched_id, "source_titles": source_titles,
+        "confidence": conf, "jurisdiction": jur, "status": "answered",
+    }
+
+
 @app.post("/api/demo/question")
 async def demo_question(req: DemoQuestionRequest):
     q = (req.question or "").strip()[:500]
