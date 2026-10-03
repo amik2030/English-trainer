@@ -96,11 +96,25 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
 .b-low { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.4); }
 .b-blue { background: rgba(79,140,255,.15); color: var(--blue); border: 1px solid rgba(79,140,255,.4); }
 .b-purple { background: rgba(157,107,255,.15); color: var(--purple); border: 1px solid rgba(157,107,255,.4); }
+.b-green { background: rgba(52,211,153,.15); color: var(--green); border: 1px solid rgba(52,211,153,.4); }
+.b-red { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.4); }
 
 /* ---------- Ask screen ---------- */
 .ask-wrap { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
 @media (max-width: 1000px) { .ask-wrap { grid-template-columns: 1fr; } }
 .chips { display: flex; flex-direction: column; gap: 8px; }
+/* source registry form */
+#kmbase input[type=text], #kmbase select {
+  background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-top: 4px;
+}
+#kmbase input[type=text]:focus, #kmbase select:focus { outline: none; border-color: var(--blue); }
+#kmbase label.small { display: block; margin-top: 6px; }
+.src-card {
+  border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  margin-bottom: 10px; background: var(--panel2);
+}
+.src-meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chip {
   text-align: left; background: var(--panel); border: 1px solid var(--border);
   color: var(--text); padding: 11px 14px; border-radius: 10px;

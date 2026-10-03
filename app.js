@@ -227,3 +227,108 @@ function escapeHtml(s) {
 
 loadAnswered();
 setInterval(loadAnswered, 60000);
+
+/* ---------- External regulatory sources (DDP taxonomy auto-tagging) ---------- */
+let TAXONOMY = null;
+
+async function initSourcePanel() {
+  try {
+    const r = await fetch(LWB_API.replace("/question", "/taxonomy"));
+    if (r.ok) TAXONOMY = await r.json();
+  } catch {}
+  const jurSel = document.getElementById("srcJur");
+  const instSel = document.getElementById("srcInst");
+  if (TAXONOMY && jurSel) {
+    TAXONOMY.jurisdictions.forEach(j => {
+      const o = document.createElement("option"); o.value = j; o.textContent = j; jurSel.appendChild(o);
+    });
+    TAXONOMY.instrument_types.forEach(t => {
+      const o = document.createElement("option"); o.value = t; o.textContent = t; instSel.appendChild(o);
+    });
+  }
+  loadSources();
+}
+
+async function addSource() {
+  const title = document.getElementById("srcTitle").value.trim();
+  const st = document.getElementById("srcStatus");
+  if (!title) { st.style.display = "block"; st.innerHTML = "⚠️ <span style='color:var(--amber)'>Title is required.</span>"; return; }
+  const btn = document.getElementById("srcAdd");
+  btn.disabled = true; btn.textContent = "⚙ Classifying against DDP taxonomy…";
+  st.style.display = "block";
+  st.innerHTML = "<span class='muted'>⚡ The classification engine is reading the source and mapping it to taxonomy nodes…</span>";
+  logEvent("source_add_attempt", "kmbase", { title: title.slice(0, 200) });
+  const payload = {
+    title,
+    publisher: document.getElementById("srcPublisher").value.trim() || null,
+    url: document.getElementById("srcUrl").value.trim() || null,
+    description: document.getElementById("srcDesc").value.trim() || null,
+    jurisdiction: document.getElementById("srcJur").value || null,
+    instrument_type: document.getElementById("srcInst").value || null,
+  };
+  try {
+    const r = await fetch(LWB_API.replace("/question", "/source"), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, added_by: visitorId() })
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    logEvent("source_added", "kmbase", { title: title.slice(0, 200), taxonomy_ids: d.source.taxonomy_ids, tags: d.source.tags });
+    ["srcTitle", "srcPublisher", "srcUrl", "srcDesc"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("srcJur").value = ""; document.getElementById("srcInst").value = "";
+    st.innerHTML = renderSourceCard(d.source, true);
+    loadSources();
+  } catch (e) {
+    st.innerHTML = "⚠️ <span style='color:var(--amber)'>Classification failed</span> — " + escapeHtml(String(e.message || e)) + ". Try again in a moment.";
+  }
+  btn.disabled = false; btn.textContent = "⚡ Add & auto-tag";
+}
+
+function renderSourceCard(s, fresh) {
+  const ids = (s.taxonomy_ids || []).map(id => {
+    const lbl = (s.taxonomy_labels && s.taxonomy_labels[id]) || (TAXONOMY && TAXONOMY.nodes[id]) || id;
+    return `<span class="badge b-purple" title="${escapeHtml(lbl)}">${escapeHtml(id)} · ${escapeHtml(lbl)}</span>`;
+  }).join(" ");
+  const tags = (s.tags || []).map(t => `<span class="badge b-blue">#${escapeHtml(t)}</span>`).join(" ");
+  const conf = Math.round((s.confidence || 0) * 100);
+  const confCls = conf >= 80 ? "b-green" : (conf >= 60 ? "b-med" : "b-red");
+  const when = s.added_at ? new Date(s.added_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
+  return `<div class="src-card"${fresh ? " style='border-left:3px solid var(--green)'" : ""}>
+    <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap">
+      <strong class="small">${escapeHtml(s.title)}</strong>
+      ${when ? `<span class="muted" style="font-size:11px">${escapeHtml(when)}</span>` : ""}
+    </div>
+    ${s.publisher ? `<div class="small muted" style="margin-top:2px">${escapeHtml(s.publisher)}${s.url ? ` · <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" style="color:var(--blue)">link ↗</a>` : ""}</div>` : (s.url ? `<div class="small muted"><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" style="color:var(--blue)">link ↗</a></div>` : "")}
+    ${s.description ? `<div class="small" style="margin-top:4px">${escapeHtml(s.description)}</div>` : ""}
+    <div class="src-meta-row">${ids}</div>
+    ${tags ? `<div class="src-meta-row">${tags}</div>` : ""}
+    <div class="src-meta-row">
+      <span class="badge b-med">${escapeHtml(s.instrument_type || "?")}</span>
+      <span class="badge b-med">${escapeHtml(s.jurisdiction || "?")}</span>
+      <span class="badge b-med">${escapeHtml(s.temporal_status || "?")}</span>
+      <span class="badge ${confCls}">confidence ${conf}%</span>
+    </div>
+    ${s.rationale ? `<div class="small muted" style="margin-top:8px">💡 ${escapeHtml(s.rationale)}</div>` : ""}
+  </div>`;
+}
+
+async function loadSources() {
+  const box = document.getElementById("srcRegistry");
+  const cnt = document.getElementById("srcCount");
+  try {
+    const r = await fetch(LWB_API.replace("/question", "/sources"));
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    if (cnt) cnt.textContent = d.count ? `(${d.count})` : "";
+    if (!d.sources.length) {
+      box.innerHTML = `<span class="small muted">No sources yet — add the first one above. Example: “EDPB Guidelines on Article 6(1)(f) legitimate interest”.</span>`;
+      return;
+    }
+    box.innerHTML = d.sources.map(s => renderSourceCard(s, false)).join("");
+  } catch (e) {
+    box.innerHTML = `<span class="small muted">Registry temporarily unavailable (${escapeHtml(String(e.message || e))}).</span>`;
+  }
+}
+
+initSourcePanel();
+setInterval(loadSources, 60000);

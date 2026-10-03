@@ -268,6 +268,45 @@
       </div>
       <p class="small muted" style="margin-top:10px"><strong style="color:var(--text)">The seamlessness test:</strong> when KM improves, AI quality improves the same day. KM improvements are AI upgrades without deployments.</p>
 
+      <h2>🌐 External regulatory sources — live ingestion &amp; auto-tagging</h2>
+      <p class="small muted" style="margin-bottom:12px">This panel is <strong style="color:var(--text)">live</strong>: add an external regulatory source and the Workbench classifies it against the <strong style="color:var(--text)">DDP Taxonomy v0.2</strong> (Data · Digital · Privacy) — dotted IDs, controlled tags, orthogonal axes (instrument type / jurisdiction / temporal status). Try it with any regulation, guidance or judgment.</p>
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin-bottom:10px">➕ Add external source</h3>
+        <div class="grid grid-2" style="gap:10px">
+          <div>
+            <label class="small muted">Title *</label>
+            <input id="srcTitle" type="text" placeholder="e.g. EDPB Guidelines 02/2025 on legitimate interest" style="width:100%">
+          </div>
+          <div>
+            <label class="small muted">Publisher / issuer</label>
+            <input id="srcPublisher" type="text" placeholder="e.g. EDPB, EUR-Lex, CJEU, FDPIC" style="width:100%">
+          </div>
+          <div>
+            <label class="small muted">URL</label>
+            <input id="srcUrl" type="text" placeholder="https://…" style="width:100%">
+          </div>
+          <div>
+            <label class="small muted">Description / abstract</label>
+            <input id="srcDesc" type="text" placeholder="one-line summary of what it covers" style="width:100%">
+          </div>
+          <div>
+            <label class="small muted">Jurisdiction (optional — AI infers)</label>
+            <select id="srcJur" style="width:100%"><option value="">— auto-detect —</option></select>
+          </div>
+          <div>
+            <label class="small muted">Instrument type (optional — AI infers)</label>
+            <select id="srcInst" style="width:100%"><option value="">— auto-detect —</option></select>
+          </div>
+        </div>
+        <button class="btn" id="srcAdd" onclick="addSource()" style="margin-top:12px">⚡ Add &amp; auto-tag</button>
+        <div id="srcStatus" class="small" style="margin-top:10px; display:none"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:4px">📚 Source registry <span class="muted small" id="srcCount"></span></h3>
+        <p class="small muted" style="margin-bottom:10px">All added sources with their auto-generated metadata — taxonomy IDs, tags, instrument type, jurisdiction, temporal status, confidence. Sorted newest first.</p>
+        <div id="srcRegistry"><span class="small muted">Loading registry…</span></div>
+      </div>
+
       <h2>The reverse flow — the Workbench is KM's best instrument</h2>
       <div class="grid grid-2">
         <div class="card">
