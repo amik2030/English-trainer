@@ -940,6 +940,166 @@ async def demo_question(req: DemoQuestionRequest):
     return {"id": row["id"] if row else None, "question": q, "answer": answer, "status": "answered"}
 
 
+# ============================================
+# Legal Workbench Demo — external regulatory sources (DDP taxonomy auto-tagging)
+# ============================================
+
+from ddp_taxonomy import (
+    TAXONOMY_NODES, TAXONOMY_TAGS, INSTRUMENT_TYPES, JURISDICTIONS,
+    TEMPORAL_STATUSES, taxonomy_labels,
+)
+
+class DemoSourceRequest(BaseModel):
+    title: str
+    publisher: Optional[str] = None
+    url: Optional[str] = None
+    description: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    instrument_type: Optional[str] = None
+    temporal_status: Optional[str] = None
+    added_by: Optional[str] = None
+
+DEMO_CLASSIFY_SYSTEM = """You are the classification engine of a Legal Research Workbench for a data-protection practice.
+You classify external regulatory sources according to the DDP Taxonomy v0.2 (Data, Digital & Privacy law).
+
+You will be given the taxonomy tree (dotted IDs), the controlled tag vocabulary, instrument types, jurisdictions and temporal statuses,
+plus a source's metadata. Respond with ONLY a JSON object, no prose:
+{
+  "taxonomy_ids": ["A.1.1", ...],        // 1-3 dotted IDs, deepest stable nodes; multi-assign allowed for cross-cutting content
+  "tags": ["data-transfer", ...],        // 0-5 tags from the controlled vocabulary ONLY
+  "instrument_type": "REGULATION",       // pick the best fit from the provided list; if user provided one, validate/keep it
+  "jurisdiction": "EU",                  // from the provided list; if user provided one, keep it
+  "temporal_status": "IN_FORCE",         // from the provided list; if user provided one, keep it
+  "confidence": 0.0-1.0,
+  "rationale": "one or two sentences explaining the classification"
+}
+
+Rules:
+- Cross-cutting content gets multi-assignment + tags, never duplicate branches (e.g. GDPR breach notification -> A.1.5 + tags data-breach).
+- Only use IDs and tags that appear in the provided vocabulary.
+- If nothing fits, use ["Z"]."""
+
+@app.post("/api/demo/source")
+async def demo_add_source(req: DemoSourceRequest):
+    title = (req.title or "").strip()[:300]
+    if not title:
+        raise HTTPException(status_code=400, detail="title required")
+
+    source_meta = {
+        "title": title,
+        "publisher": (req.publisher or "").strip()[:200] or None,
+        "url": (req.url or "").strip()[:500] or None,
+        "description": (req.description or "").strip()[:1000] or None,
+        "jurisdiction_hint": (req.jurisdiction or "").strip().upper()[:10] or None,
+        "instrument_hint": (req.instrument_type or "").strip().upper()[:30] or None,
+        "temporal_hint": (req.temporal_status or "").strip().upper()[:20] or None,
+        "added_by": (req.added_by or "demo-user")[:64],
+    }
+
+    classify_prompt = (
+        "TAXONOMY TREE (dotted ID -> label):\n"
+        + "\n".join(f"{k}  {v}" for k, v in TAXONOMY_NODES.items())
+        + "\n\nCONTROLLED TAGS: " + ", ".join(TAXONOMY_TAGS)
+        + "\nINSTRUMENT TYPES: " + ", ".join(INSTRUMENT_TYPES)
+        + "\nJURISDICTIONS: " + ", ".join(JURISDICTIONS)
+        + "\nTEMPORAL STATUSES: " + ", ".join(TEMPORAL_STATUSES)
+        + "\n\nSOURCE TO CLASSIFY (JSON):\n" + json.dumps(source_meta, ensure_ascii=False)
+    )
+
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": DEMO_CLASSIFY_SYSTEM},
+                {"role": "user", "content": classify_prompt},
+            ],
+            max_tokens=600,
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content or "{}"
+        cls = json.loads(raw)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"classification failed: {e}")
+
+    # Sanitize classification against the controlled vocabularies
+    ids = [str(i).strip() for i in cls.get("taxonomy_ids", []) if str(i).strip() in TAXONOMY_NODES][:3]
+    if not ids:
+        ids = ["Z"]
+    tags = [str(t).strip().lstrip("#") for t in cls.get("tags", []) if str(t).strip().lstrip("#") in TAXONOMY_TAGS][:5]
+    inst = cls.get("instrument_type") or source_meta["instrument_hint"] or "COMMENTARY"
+    if inst not in INSTRUMENT_TYPES:
+        inst = source_meta["instrument_hint"] if source_meta["instrument_hint"] in INSTRUMENT_TYPES else "COMMENTARY"
+    jur = cls.get("jurisdiction") or source_meta["jurisdiction_hint"] or "INTL"
+    if jur not in JURISDICTIONS:
+        jur = source_meta["jurisdiction_hint"] if source_meta["jurisdiction_hint"] in JURISDICTIONS else "INTL"
+    temp = cls.get("temporal_status") or source_meta["temporal_hint"] or "IN_FORCE"
+    if temp not in TEMPORAL_STATUSES:
+        temp = source_meta["temporal_hint"] if source_meta["temporal_hint"] in TEMPORAL_STATUSES else "IN_FORCE"
+    try:
+        conf = max(0.0, min(1.0, float(cls.get("confidence", 0.8))))
+    except (TypeError, ValueError):
+        conf = 0.8
+    rationale = str(cls.get("rationale", ""))[:500]
+
+    record = {
+        **source_meta,
+        "taxonomy_ids": ids,
+        "taxonomy_labels": taxonomy_labels(ids),
+        "tags": tags,
+        "instrument_type": inst,
+        "jurisdiction": jur,
+        "temporal_status": temp,
+        "confidence": conf,
+        "rationale": rationale,
+    }
+
+    # Persist in the demo event store (schema-free detail column)
+    try:
+        supabase_admin.table("demo_events").insert({
+            "visitor_id": source_meta["added_by"],
+            "event_type": "source_added",
+            "screen": "kmbase",
+            "detail": record,
+        }).execute()
+    except Exception:
+        pass  # registry write is best-effort; classification result still returned
+
+    log = {"event_type": "source_added"}
+    return {"status": "added", "source": record}
+
+
+@app.get("/api/demo/sources")
+async def demo_list_sources():
+    try:
+        res = supabase_admin.table("demo_events").select("id, created_at, detail") \
+            .eq("event_type", "source_added").order("created_at", desc=True).limit(100).execute()
+        rows = res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"registry read failed: {e}")
+    sources = []
+    for r in rows:
+        d = r.get("detail") or {}
+        if not d.get("title"):
+            continue
+        d["added_at"] = r.get("created_at")
+        sources.append(d)
+    return {"count": len(sources), "sources": sources}
+
+
+@app.get("/api/demo/taxonomy")
+async def demo_taxonomy():
+    """Expose the DDP taxonomy v0.2 tree + vocabularies for the frontend."""
+    return {
+        "version": "0.2",
+        "nodes": TAXONOMY_NODES,
+        "tags": TAXONOMY_TAGS,
+        "instrument_types": INSTRUMENT_TYPES,
+        "jurisdictions": JURISDICTIONS,
+        "temporal_statuses": TEMPORAL_STATUSES,
+    }
+
+
 @app.get("/app")
 async def serve_frontend():
     frontend_path = Path(__file__).parent.parent / "frontend" / "index.html"
