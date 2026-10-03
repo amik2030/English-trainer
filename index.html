@@ -105,70 +105,17 @@
     <section id="ask" class="screen">
       <div class="eyebrow">Mode 1 · General Consulting</div>
       <h1>⚡ Ask</h1>
-      <p class="lede">Quick legal checks with exact citations, confidence scores, and a human review gate. Pick a sample question or type your own.</p>
+      <p class="lede">One bar, every question. The board answers <strong>live</strong> from the ingested knowledge base — previously answered questions are matched and reused, every exchange is stored and becomes citable. Nothing here is mocked.</p>
 
-      <div class="ask-wrap">
-        <div>
-          <h3 class="small muted" style="margin-bottom:10px; text-transform:uppercase; letter-spacing:.08em; font-size:11.5px">Try a sample query</h3>
-          <div class="chips" id="chipBox"></div>
+      <div class="ask-hero">
+        <div class="query-bar ask-main">
+          <input id="askInput" type="text" placeholder="Ask anything — e.g. Does the EU AI Act apply to our vendor's patient-triage chatbot?">
+          <button class="btn" id="askBtn" onclick="askBoard()">Ask ⏎</button>
         </div>
-        <div>
-          <div class="query-bar">
-            <input id="askInput" type="text" placeholder="e.g. Does the EU AI Act apply to our vendor's patient-triage chatbot?">
-            <button class="btn" onclick="runQuery()">Ask ⏎</button>
-          </div>
-
-          <div class="thinking" id="thinking"><span class="spinner"></span><span id="thinkText">Parsing query…</span></div>
-
-          <div class="answer" id="answerBox">
-            <div class="card" style="margin-bottom:14px">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px">
-                <div>
-                  <span class="badge b-blue" id="ansType">Scenario check</span>
-                  <span class="badge b-purple" style="margin-left:6px" id="ansJur">EU</span>
-                </div>
-                <span class="small muted" id="ansTime"></span>
-              </div>
-              <div id="ansBody" style="font-size:15px"></div>
-            </div>
-
-            <div class="grid grid-2">
-              <div class="card">
-                <h3>📚 Sources retrieved <span class="small muted" id="srcCount"></span></h3>
-                <div id="srcList"></div>
-              </div>
-              <div class="card">
-                <h3>🛡 Verification</h3>
-                <div id="verBox"></div>
-              </div>
-            </div>
-
-            <div class="gap-flag" id="gapFlag" style="display:none"></div>
-
-            <div class="review-gate" id="reviewGate">
-              <div class="rg-title">🧑‍⚖️ HUMAN REVIEW GATE — mandatory before this answer leaves the Workbench</div>
-              <div class="small muted" style="margin-bottom:12px">Monitor &amp; Summarizer run semi-autonomously. <strong style="color:var(--text)">Researcher outputs always require human approval</strong> — this is where legal risk lives. Your decision is logged to the audit trail.</div>
-              <div style="display:flex; gap:10px; flex-wrap:wrap">
-                <button class="btn green sm" onclick="review('approved')">✓ Approve &amp; share</button>
-                <button class="btn amber sm" onclick="review('revise')">✎ Request revision</button>
-                <button class="btn ghost sm" onclick="review('rejected')">✗ Reject</button>
-              </div>
-              <div id="reviewResult" class="small" style="margin-top:10px; display:none"></div>
-            </div>
-          </div>
-
-          <!-- Question wall -->
-          <div class="card" style="margin-top:24px" id="questionWall">
-            <h3>💬 Ask the board a real question</h3>
-            <p class="small muted" style="margin-bottom:12px">The demo screens run on mock data — but <em>this</em> box is live: the Workbench answering board reads your question and replies immediately, with every exchange logged to the audit trail. Try it: what would <em>you</em> ask?</p>
-            <div class="query-bar" style="margin-bottom:6px">
-              <input id="qInput" type="text" placeholder="e.g. How would the Workbench handle our clinical-trial consent forms?">
-              <button class="btn" id="qSubmit" onclick="askQuestion()">Submit</button>
-            </div>
-            <div id="qStatus" class="small" style="margin-bottom:12px; display:none"></div>
-            <div id="qAnswered"></div>
-          </div>
-        </div>
+        <div class="suggest-row" id="suggestBox"></div>
+        <div class="thinking" id="thinking"><span class="spinner"></span><span id="thinkText">Consulting the knowledge base…</span></div>
+        <div id="streamNew"></div>
+        <div id="streamHistory"></div>
       </div>
     </section>
 

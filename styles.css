@@ -103,6 +103,29 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
 .ask-wrap { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
 @media (max-width: 1000px) { .ask-wrap { grid-template-columns: 1fr; } }
 .chips { display: flex; flex-direction: column; gap: 8px; }
+
+/* unified live ask */
+.ask-hero { max-width: 860px; margin: 0 auto; }
+.ask-main { margin-bottom: 10px; }
+.ask-main input {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 20px; font-size: 15.5px; box-shadow: 0 4px 24px rgba(0,0,0,.25);
+}
+.ask-main input:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(157,107,255,.15); }
+.ask-main .btn { border-radius: 14px; padding: 0 26px; font-size: 15px; }
+.suggest-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
+.suggest-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.suggest-pill {
+  background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+  font-size: 12px; padding: 5px 12px; border-radius: 20px; cursor: pointer;
+  font-family: inherit; transition: all .15s;
+}
+.suggest-pill:hover { border-color: var(--purple); color: var(--purple); }
+.ans-card { border-left: 3px solid var(--green); animation: fadeIn .4s ease; }
+.ans-body { font-size: 15px; line-height: 1.75; white-space: normal; }
+.kb-card { cursor: pointer; transition: border-color .15s, transform .15s; }
+.kb-card:hover { border-color: var(--blue); transform: translateY(-2px); }
+.kb-a { color: var(--muted); }
 /* source registry form */
 #kmbase input[type=text], #kmbase select {
   background: var(--panel2); border: 1px solid var(--border); color: var(--text);

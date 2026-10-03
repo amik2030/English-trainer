@@ -21,105 +21,103 @@ function toast(msg) {
   t._h = setTimeout(() => t.classList.remove("on"), 4200);
 }
 
-/* ---------- Ask screen ---------- */
-const chipBox = document.getElementById("chipBox");
-SAMPLE_QUERIES.forEach(q => {
-  const b = document.createElement("button");
-  b.className = "chip";
-  b.innerHTML = `<span class="chip-mode">${q.mode}</span>${q.chip}`;
-  b.onclick = () => { document.getElementById("askInput").value = q.chip; runQuery(q.id); };
-  chipBox.appendChild(b);
-});
+/* ---------- Ask screen — one live bar, DB-backed knowledge base ---------- */
+const ASK_API = LWB_API.replace("/question", "/ask");
+let askBusy = false;
+let KB = [];
 
-document.getElementById("askInput").addEventListener("keydown", e => {
-  if (e.key === "Enter") runQuery();
-});
+function trunc(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
-let currentQuery = null;
-
-function runQuery(forcedId) {
-  const input = document.getElementById("askInput").value.trim();
-  if (!input && !forcedId) return;
-  const q = forcedId
-    ? SAMPLE_QUERIES.find(x => x.id === forcedId)
-    : (SAMPLE_QUERIES.find(x => x.chip === input) || SAMPLE_QUERIES[0]);
-  currentQuery = q;
-  logEvent("query_run", "ask", { query_id: q.id, question: q.chip });
-
-  const box = document.getElementById("answerBox");
-  box.classList.remove("on");
-  document.getElementById("reviewResult").style.display = "none";
-
-  // staged "thinking" for realism
-  const thinking = document.getElementById("thinking");
-  const thinkText = document.getElementById("thinkText");
-  thinking.classList.add("on");
-  let step = 0;
-  const iv = setInterval(() => {
-    thinkText.textContent = THINK_STEPS[step % THINK_STEPS.length];
-    step++;
-  }, 380);
-
-  setTimeout(() => {
-    clearInterval(iv);
-    thinking.classList.remove("on");
-    renderAnswer(q);
-  }, 2400);
+async function initAsk() {
+  const inp = document.getElementById("askInput");
+  if (!inp) return;
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") askBoard(); });
+  loadKB();
+  loadStream();
 }
 
-function renderAnswer(q) {
-  document.getElementById("ansType").textContent = q.type;
-  document.getElementById("ansJur").textContent = q.jur;
-  document.getElementById("ansTime").textContent =
-    "Answer generated in 6.4s · " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  document.getElementById("ansBody").innerHTML = q.answer;
-
-  document.getElementById("srcCount").textContent = "(" + q.sources.length + ")";
-  document.getElementById("srcList").innerHTML = q.sources.map(s => `
-    <div class="src-item">
-      <span class="src-ico">${s.ico}</span>
-      <span>${s.txt}<br><span class="muted" style="font-size:11.5px">${s.tag} · <span style="color:var(--green)">${s.conf}</span></span></span>
-    </div>`).join("");
-
-  document.getElementById("verBox").innerHTML = q.ver.map(v => `
-    <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border)" class="small">
-      <span class="muted">${v.label}</span><span class="badge ${v.cls}">${v.val}</span>
-    </div>`).join("") +
-    `<p class="small muted" style="margin-top:10px">Every claim is checked against retrieved sources by an NLI verifier before you see it. Unsupported claims never reach the answer.</p>`;
-
-  const gap = document.getElementById("gapFlag");
-  if (q.gap) { gap.style.display = "block"; gap.innerHTML = q.gap; }
-  else gap.style.display = "none";
-
-  const box = document.getElementById("answerBox");
-  box.classList.add("on");
-  // staggered reveal
-  const blocks = box.querySelectorAll(":scope > *");
-  blocks.forEach((b, i) => {
-    b.classList.remove("show");
-    b.style.opacity = "0";
-    b.style.transform = "translateY(8px)";
-    b.style.transition = "all .45s ease";
-    setTimeout(() => { b.style.opacity = "1"; b.style.transform = "none"; }, 120 * i);
-  });
-  box.scrollIntoView({ behavior: "smooth", block: "start" });
+async function loadKB() {
+  const qs = await fetchAnsweredQuestions();
+  KB = qs;
+  const box = document.getElementById("suggestBox");
+  if (!box) return;
+  if (!qs.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<span class="suggest-lbl">Knowledge base — tap to recall:</span>` +
+    qs.slice(0, 4).map(q => `<button class="suggest-pill" onclick="askPrefill(${q.id})">${escapeHtml(trunc(q.question, 70))}</button>`).join("");
 }
 
-function review(action) {
-  logEvent("review_decision", "ask", { query_id: currentQuery ? currentQuery.id : null, decision: action });
-  const rr = document.getElementById("reviewResult");
-  rr.style.display = "block";
-  const ts = new Date().toLocaleString();
-  if (action === "approved") {
-    rr.innerHTML = `✅ <span style="color:var(--green)">Approved</span> — logged to audit trail (query → chunks → output → your decision). Answer stored in the answer log; future similar queries will surface it first. <span class="muted">(${ts} · reviewer: you)</span>`;
-    toast("✅ Approved &amp; shared. The answer is now a documented position — the 2nd identical question answers itself.");
-  } else if (action === "revise") {
-    rr.innerHTML = `✎ <span style="color:var(--amber)">Revision requested</span> — your corrections are captured and feed back: future summaries and synthesis improve from this review. <span class="muted">(${ts})</span>`;
-    toast("✎ Revision routed back with your comments. Corrections improve the knowledge base — feedback loop in action.");
-  } else {
-    rr.innerHTML = `✗ <span style="color:var(--red)">Rejected</span> — output quarantined, never shared. Rejection reason requested for the audit trail and gap analysis. <span class="muted">(${ts})</span>`;
-    toast("✗ Rejected &amp; quarantined. Nothing leaves the Workbench without human approval.");
+function askPrefill(id) {
+  const q = KB.find(x => x.id === id);
+  if (!q) return;
+  document.getElementById("askInput").value = q.question;
+  askBoard();
+}
+
+async function askBoard() {
+  const inp = document.getElementById("askInput");
+  const q = inp.value.trim();
+  if (!q || askBusy) return;
+  askBusy = true;
+  const btn = document.getElementById("askBtn");
+  btn.disabled = true;
+  document.getElementById("thinking").classList.add("on");
+  document.getElementById("streamNew").innerHTML = "";
+  logEvent("query_run", "ask", { question: q.slice(0, 200) });
+  try {
+    const r = await fetch(ASK_API, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, visitor_id: visitorId() })
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    inp.value = "";
+    renderNewAnswer(d);
+    loadKB();
+    loadStream();
+  } catch (e) {
+    document.getElementById("streamNew").innerHTML =
+      `<div class="card" style="border-color:var(--amber)"><span class="small" style="color:var(--amber)">⚠️ The board is unreachable right now (${escapeHtml(String(e.message || e))}). Try again in a moment.</span></div>`;
   }
+  document.getElementById("thinking").classList.remove("on");
+  btn.disabled = false;
+  askBusy = false;
+}
+
+function renderNewAnswer(d) {
+  const conf = Math.round((d.confidence || 0) * 100);
+  const confCls = conf >= 80 ? "b-high" : conf >= 60 ? "b-med" : "b-low";
+  const srcs = (d.source_titles || []).map(t => `<span class="badge b-blue">📚 ${escapeHtml(trunc(t, 60))}</span>`).join(" ");
+  const reuse = d.reused
+    ? `<span class="badge b-purple">♻ Reused from knowledge base · entry #${d.matched_id}</span>`
+    : `<span class="badge b-green">🆕 New answer · stored as KB entry #${d.id != null ? d.id : "—"}</span>`;
+  document.getElementById("streamNew").innerHTML = `
+    <div class="card ans-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom:10px">
+        <div style="display:flex; gap:6px; flex-wrap:wrap">${reuse}<span class="badge b-purple">${escapeHtml(d.jurisdiction || "INTL")}</span><span class="badge ${confCls}">confidence ${conf}%</span></div>
+        <span class="small muted">${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+      <div class="small muted" style="margin-bottom:8px"><strong style="color:var(--text)">Q:</strong> ${escapeHtml(d.question)}</div>
+      <div class="ans-body">${escapeHtml(d.answer).replace(/\n\n/g, "<br><br>").replace(/\n/g, "<br>")}</div>
+      ${srcs ? `<div class="src-meta-row">${srcs}</div>` : ""}
+    </div>`;
+  document.getElementById("streamNew").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function loadStream() {
+  const qs = await fetchAnsweredQuestions();
+  const box = document.getElementById("streamHistory");
+  if (!box) return;
+  if (!qs.length) {
+    box.innerHTML = `<div class="small muted" style="margin-top:14px">No exchanges yet — the first question above starts the knowledge base.</div>`;
+    return;
+  }
+  box.innerHTML = `<h3 style="margin:18px 0 10px">🗄 Knowledge base — answered exchanges <span class="muted small">(${qs.length})</span></h3>` +
+    qs.map(q => `
+    <div class="card kb-card" onclick="askPrefill(${q.id})" title="Tap to re-ask">
+      <div class="small"><strong>Q:</strong> ${escapeHtml(q.question)}</div>
+      <div class="small kb-a" style="margin-top:6px"><span style="color:var(--green)">A:</span> ${escapeHtml(trunc(q.answer || "", 280))}</div>
+      <div class="small muted" style="margin-top:6px">${q.answered_at ? new Date(q.answered_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : ""}</div>
+    </div>`).join("");
 }
 
 /* ---------- Projects ---------- */
@@ -180,53 +178,12 @@ if (location.hash) {
 }
 logEvent("session_start", location.hash ? location.hash.replace("#", "") : "home");
 
-/* ---------- Question wall (instant answer by the board) ---------- */
-async function askQuestion() {
-  const inp = document.getElementById("qInput");
-  const st = document.getElementById("qStatus");
-  const q = inp.value.trim();
-  if (!q) return;
-  const btn = document.getElementById("qSubmit");
-  btn.disabled = true; btn.textContent = "…";
-  st.style.display = "block";
-  st.innerHTML = "<span class='muted'>⚡ The answering board is composing your answer…</span>";
-  logEvent("question_submit", "ask", { question: q.slice(0, 200) });
-  const res = await submitQuestion(q);
-  btn.disabled = false; btn.textContent = "Submit";
-  if (res && res.answer) {
-    inp.value = "";
-    st.innerHTML =
-      `<div style="border-left:3px solid var(--green); padding:10px 14px; background:var(--panel2); border-radius:0 10px 10px 0">` +
-      `<div class="small"><strong>Q:</strong> ${escapeHtml(q)}</div>` +
-      `<div class="small" style="margin-top:6px"><span style="color:var(--green)">A:</span> ${escapeHtml(res.answer)}</div>` +
-      `<div class="small muted" style="margin-top:6px">⚡ Answered instantly by the board · logged to the live audit trail</div>` +
-      `</div>`;
-    loadAnswered();
-  } else if (res && res.queued) {
-    inp.value = "";
-    st.innerHTML = "⚠️ <span style='color:var(--amber)'>The board is briefly unavailable</span> — your question was queued and will appear below once answered.";
-  } else {
-    st.innerHTML = "⚠️ <span style='color:var(--amber)'>Submission temporarily unavailable</span> — the demo works fully offline; try again later.";
-  }
-}
-
-async function loadAnswered() {
-  const qs = await fetchAnsweredQuestions();
-  const box = document.getElementById("qAnswered");
-  if (!qs.length) { box.innerHTML = ""; return; }
-  box.innerHTML = `<h3 style="margin-top:6px">⚡ Answered live by the board</h3>` + qs.map(q => `
-    <div style="border-left:3px solid var(--green); padding:8px 14px; margin-bottom:10px; background:var(--panel2); border-radius:0 10px 10px 0">
-      <div class="small"><strong>Q:</strong> ${escapeHtml(q.question)}</div>
-      <div class="small" style="margin-top:6px"><span style="color:var(--green)">A:</span> ${escapeHtml(q.answer || "")}</div>
-    </div>`).join("");
-}
-
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-loadAnswered();
-setInterval(loadAnswered, 60000);
+initAsk();
+setInterval(loadStream, 60000);
 
 /* ---------- External regulatory sources (DDP taxonomy auto-tagging) ---------- */
 let TAXONOMY = null;
