@@ -60,9 +60,18 @@
   function showLogin() { location.replace("/login.html"); }
 
   async function enterApp() {
-    try { ME = await api("/api/me"); } catch (e) {
+    try {
+      try { ME = await api("/api/me"); }
+      catch (e1) {
+        if (String(e1.message).indexOf("session expired") !== -1) throw e1;
+        await new Promise((r) => setTimeout(r, 1500));
+        ME = await api("/api/me"); // one retry (cold start)
+      }
+    } catch (e) {
       console.error("enterApp failed:", e);
-      alert("Login OK but profile load failed: " + e.message);
+      if (String(e.message).indexOf("session expired") === -1) {
+        alert("Login OK but profile load failed: " + e.message);
+      }
       showLogin(); return;
     }
     $("#login").classList.add("hidden");
