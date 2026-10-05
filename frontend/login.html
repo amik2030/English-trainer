@@ -9,12 +9,17 @@
 <style>
 body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 .login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; }
-.login-card { width:400px; max-width:92vw; text-align:center; padding:28px 24px; }
+.login-card { width:410px; max-width:92vw; text-align:center; padding:30px 26px; }
 .login-card input { width:100%; padding:13px 15px; border-radius:11px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:15px; margin:10px 0; outline:none; }
 .login-card input:focus { border-color: var(--blue); }
 .hidden { display:none !important; }
-.err { color: var(--red); min-height: 18px; }
+.err { color: var(--red); min-height: 20px; }
 .ok { color: var(--green); }
+.tabs { display:flex; gap:0; margin:18px 0 6px; border:1px solid var(--border); border-radius:11px; overflow:hidden; }
+.tab { flex:1; padding:11px 10px; background:var(--panel); color:var(--muted); font-size:14px; font-weight:600; cursor:pointer; }
+.tab.active { background:linear-gradient(135deg, rgba(79,140,255,.3), rgba(157,107,255,.2)); color:#fff; }
+.btn { width:100%; padding:13px; border-radius:11px; border:none; background:linear-gradient(135deg, var(--blue), var(--purple)); color:#fff; font-weight:700; font-size:15px; cursor:pointer; margin-top:8px; }
+.btn:disabled { opacity:.6; cursor:default; }
 @media (max-width:480px){ .login-card{padding:18px 14px} }
 </style>
 </head>
@@ -23,73 +28,111 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
   <div class="card login-card">
     <div class="brand-logo" style="margin:0 auto 14px">§</div>
     <h1 style="font-size:22px">Pocket DDP Workbench</h1>
-    <p class="muted small" style="margin:6px 0 14px">Private legal research workbench · human-curated knowledge</p>
+    <p class="muted small" style="margin:6px 0 0">Private legal research workbench · human-curated knowledge</p>
 
-    <input id="email" type="email" placeholder="email" autocomplete="email" style="text-align:left">
-    <input id="pw" type="password" placeholder="password (min 6 characters)" autocomplete="current-password" style="text-align:left">
-    <input id="pw2" type="password" placeholder="repeat password (new accounts)" autocomplete="new-password" style="text-align:left">
-    <button class="btn primary" style="width:100%;margin-top:6px" id="go">Sign in / Sign up</button>
+    <div class="tabs">
+      <div class="tab active" id="tab-in">🔑 Sign in</div>
+      <div class="tab" id="tab-up">✚ Create account</div>
+    </div>
+
+    <div id="pane-in">
+      <input id="in-email" type="email" placeholder="email" autocomplete="email" style="text-align:left">
+      <input id="in-pw" type="password" placeholder="password" autocomplete="current-password" style="text-align:left">
+      <button class="btn" id="in-go">Sign in</button>
+    </div>
+
+    <div id="pane-up" class="hidden">
+      <input id="up-email" type="email" placeholder="your email" autocomplete="email" style="text-align:left">
+      <input id="up-pw" type="password" placeholder="choose a password (min 6 characters)" autocomplete="new-password" style="text-align:left">
+      <input id="up-pw2" type="password" placeholder="repeat password" autocomplete="new-password" style="text-align:left">
+      <button class="btn" id="up-go">Create account &amp; sign in</button>
+      <p class="muted small" style="margin-top:8px">Instant account — no email confirmation needed.</p>
+    </div>
+
     <p class="err small" id="msg"></p>
-    <p class="muted small" id="explain" style="margin-top:6px">One form does both: existing account → sign in, new account → sign up (instant, no email confirmation).</p>
   </div>
 </div>
 <script>
 const $ = (s) => document.querySelector(s);
-const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let SB = null;
 
 (async function boot() {
   try {
-    const cfg = await (await fetch("/api/config")).json();
+    const cfg = await (await fetch("/api/config?v=" + Date.now(), { cache: "no-store" })).json();
     SB = supabase.createClient(cfg.supabase_url, cfg.anon_key, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
     const { data } = await SB.auth.getSession();
     if (data?.session) { location.replace("/app.html"); return; }
-    wire();
   } catch (e) {
     show("Backend unreachable: " + e.message);
+    return;
   }
+  wire();
 })();
 
 function wire() {
-  const enter = (ev) => { if (ev.key === "Enter") go(); };
-  $("#email").addEventListener("keydown", enter);
-  $("#pw").addEventListener("keydown", enter);
-  $("#pw2").addEventListener("keydown", enter);
-  $("#go").addEventListener("click", go);
+  $("#tab-in").onclick = () => pane("in");
+  $("#tab-up").onclick = () => pane("up");
+  $("#in-go").onclick = signIn;
+  $("#up-go").onclick = signUp;
+  [["in-email", signIn], ["in-pw", signIn], ["up-email", signUp], ["up-pw", signUp], ["up-pw2", signUp]]
+    .forEach(([id, fn]) => $( "#" + id).addEventListener("keydown", (e) => { if (e.key === "Enter") fn(); }));
 }
 
-async function go() {
-  const email = $("#email").value.trim();
-  const pw = $("#pw").value;
-  const pw2 = $("#pw2").value;
-  if (!email || !pw) { show("Enter your email and a password."); return; }
-  if (pw.length < 6) { show("Password must be at least 6 characters."); return; }
-  busy(true); show("");
+function pane(which) {
+  $("#tab-in").classList.toggle("active", which === "in");
+  $("#tab-up").classList.toggle("active", which === "up");
+  $("#pane-in").classList.toggle("hidden", which !== "in");
+  $("#pane-up").classList.toggle("hidden", which !== "up");
+  show("");
+}
+
+async function signIn() {
+  const email = $("#in-email").value.trim();
+  const pw = $("#in-pw").value;
+  if (!email || !pw) { show("Enter your email and password."); return; }
+  busy("#in-go", true, "Signing in…");
+  show("");
   try {
-    let res = await SB.auth.signInWithPassword({ email, password: pw });
-    if (res.error) {
-      // unknown account or wrong password → try sign-up (only if confirm fields plausible)
-      if (!pw2 || pw2 !== pw) {
-        show("Wrong password for existing account — or, to create it, repeat the same password below.");
-        busy(false); return;
-      }
-      res = await SB.auth.signUp({ email, password: pw });
-      if (res.error) throw res.error;
-      if (!res.data?.session) {
-        show("Account created. Sign-in blocked (check confirmation settings)", "ok");
-        busy(false); return;
-      }
-    }
-    show("✓ Signed in — opening the workbench…", "ok");
+    const { error } = await SB.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    show("✓ Signed in — opening…", "ok");
     location.replace("/app.html");
   } catch (e) {
-    show(e.message || String(e));
+    show(pretty(e.message));
+    busy("#in-go", false, "Sign in");
   }
-  busy(false);
 }
-function busy(b) { $("#go").disabled = b; $("#go").textContent = b ? "Working…" : "Sign in / Sign up"; }
+
+async function signUp() {
+  const email = $("#up-email").value.trim();
+  const pw = $("#up-pw").value;
+  const pw2 = $("#up-pw2").value;
+  if (!email || !pw) { show("Enter your email and a password."); return; }
+  if (pw.length < 6) { show("Password must be at least 6 characters."); return; }
+  if (pw !== pw2) { show("Passwords don't match."); return; }
+  busy("#up-go", true, "Creating account…");
+  show("");
+  try {
+    const { data, error } = await SB.auth.signUp({ email, password: pw });
+    if (error) throw error;
+    if (!data?.session) { show("Account created — but sign-in is blocked by auth settings. Tell Neo.", "ok"); busy("#up-go", false, "Create account & sign in"); return; }
+    show("✓ Account created — opening…", "ok");
+    location.replace("/app.html");
+  } catch (e) {
+    show(pretty(e.message));
+    busy("#up-go", false, "Create account & sign in");
+  }
+}
+
+function pretty(m) {
+  m = m || "Something went wrong.";
+  if (/Invalid login credentials/i.test(m)) return "Wrong email or password. New here? Use “Create account”.";
+  if (/already registered|already been registered/i.test(m)) return "That email already has an account — use “Sign in”.";
+  return m;
+}
+function busy(sel, b, label) { const el = $(sel); el.disabled = b; el.textContent = label; }
 function show(t, cls) { const m = $("#msg"); m.textContent = t; m.className = "small " + (cls || "err"); }
 </script>
 </body>
