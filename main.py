@@ -521,6 +521,19 @@ FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 if not FRONTEND_DIR.exists():
     FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class NoCacheStatic(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        resp = await call_next(request)
+        ct = resp.headers.get("content-type", "")
+        path = request.url.path
+        if ("html" in ct or "javascript" in ct or "css" in ct or path in ("/", "/login.html", "/app.html")):
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers.pop("ETag", None)
+        return resp
+
+app.add_middleware(NoCacheStatic)
 
 if FRONTEND_DIR.exists():
     @app.get("/")
