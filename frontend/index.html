@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pocket DDP Workbench</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* app-specific additions */
+.ask-bar { display:flex; gap:10px; margin:18px 0 26px; }
+.ask-bar input { flex:1; padding:14px 16px; border-radius:12px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:15px; outline:none; }
+.ask-bar input:focus { border-color: var(--blue); }
+.btn { padding:12px 20px; border-radius:11px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-weight:600; font-size:14px; cursor:pointer; transition:all .15s; }
+.btn:hover { border-color: var(--blue); }
+.btn.primary { background:linear-gradient(135deg, var(--blue), var(--purple)); border:none; color:#fff; }
+.btn.small { padding:7px 13px; font-size:12.5px; border-radius:9px; }
+.btn.green { background:rgba(52,211,153,.15); border-color:rgba(52,211,153,.4); color:var(--green); }
+.btn.red { background:rgba(248,113,113,.12); border-color:rgba(248,113,113,.4); color:var(--red); }
+.btn.amber { background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.4); color:var(--amber); }
+.badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:var(--panel2); color:var(--muted); border:1px solid var(--border); margin:2px 3px 2px 0; }
+.badge.blue { background:rgba(79,140,255,.15); border-color:rgba(79,140,255,.4); color:var(--blue); }
+.badge.green { background:rgba(52,211,153,.15); border-color:rgba(52,211,153,.4); color:var(--green); }
+.badge.amber { background:rgba(251,191,36,.15); border-color:rgba(251,191,36,.4); color:var(--amber); }
+.badge.red { background:rgba(248,113,113,.12); border-color:rgba(248,113,113,.4); color:var(--red); }
+.badge.purple { background:rgba(157,107,255,.15); border-color:rgba(157,107,255,.4); color:var(--purple); }
+.qa-card { margin-bottom:16px; }
+.qa-q { font-weight:700; margin-bottom:8px; }
+.qa-a { color:var(--text); white-space:pre-wrap; }
+.qa-meta { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.cit { font-size:12px; color:var(--muted); }
+.cit b { color:var(--blue); font-weight:600; }
+.login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; }
+.login-card { width:400px; max-width:92vw; text-align:center; }
+.login-card input { width:100%; padding:13px 15px; border-radius:11px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:15px; margin:14px 0; outline:none; }
+.hidden { display:none !important; }
+.review-item { border-left:3px solid var(--amber); }
+.review-item.approved { border-left-color: var(--green); }
+.review-item.rejected { border-left-color: var(--red); }
+textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:13.5px; font-family:inherit; margin:8px 0; outline:none; }
+.row-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.section-head { display:flex; align-items:center; justify-content:space-between; margin:30px 0 12px; }
+.section-head h2 { margin:0; }
+.spin { display:inline-block; width:14px; height:14px; border:2px solid var(--muted); border-top-color:transparent; border-radius:50%; animation:sp .8s linear infinite; vertical-align:-2px; }
+@keyframes sp { to { transform:rotate(360deg);} }
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--border); padding:12px 22px; border-radius:12px; font-size:14px; z-index:99; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+.user-chip { display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:9px; background:var(--panel); border:1px solid var(--border); font-size:12.5px; margin-bottom:10px; }
+.user-chip .em { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px; }
+.kb-group { margin-bottom:22px; }
+.src-form input, .src-form select { width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:13.5px; margin-bottom:8px; outline:none; }
+.tabs { display:flex; gap:6px; margin:16px 0 20px; flex-wrap:wrap; }
+.tab { padding:8px 16px; border-radius:20px; border:1px solid var(--border); background:var(--panel); color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; }
+.tab.active { color:#fff; border-color:rgba(79,140,255,.5); background:rgba(79,140,255,.18); }
+@media (max-width:820px){ .sidebar{display:none} .main{padding:20px 16px 60px} .grid-3,.grid-2{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login" class="login-wrap hidden">
+  <div class="card login-card">
+    <div class="brand-logo" style="margin:0 auto 14px">§</div>
+    <h1 style="font-size:22px">Pocket DDP Workbench</h1>
+    <p class="muted small" style="margin-top:6px">Private legal research workbench · human-curated knowledge</p>
+    <div id="login-step-email">
+      <div class="tabs" style="justify-content:center">
+        <div class="tab" data-lm="magic">✉️ Magic link</div>
+        <div class="tab active" data-lm="password">🔑 Password</div>
+      </div>
+      <input id="login-email" type="email" placeholder="your@email.com" autocomplete="email">
+      <input id="login-password" type="password" placeholder="Password (min 6 chars)" autocomplete="current-password" class="hidden">
+      <div id="login-fields-pw" class="hidden">
+        <input id="login-password2" type="password" placeholder="Repeat password" autocomplete="new-password">
+      </div>
+      <button class="btn primary" style="width:100%" id="login-btn">Sign in</button>
+      <p class="muted small" style="margin-top:8px" id="login-mode-hint">New here? Same form — just pick a password and you're in.</p>
+    </div>
+    <div id="login-step-sent" class="hidden">
+      <p style="margin:18px 0" class="muted">✉️ Check your inbox — click the magic link to sign in.</p>
+      <button class="btn small" id="login-back">Use another email</button>
+    </div>
+    <p id="login-msg" class="small" style="margin-top:14px; min-height:18px"></p>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">§</div>
+      <div>
+        <div class="brand-name">Pocket DDP<br>Workbench</div>
+        <div class="brand-sub">Curated · Cited · Private</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="#ask" class="nav-link active" data-screen="ask"><span class="nav-icon">⚡</span> Ask</a>
+      <a href="#kb" class="nav-link" data-screen="kb"><span class="nav-icon">🧱</span> Knowledge Base</a>
+      <a href="#sources" class="nav-link" data-screen="sources"><span class="nav-icon">📚</span> Sources</a>
+      <a href="#review" class="nav-link hidden" data-screen="review" id="nav-review"><span class="nav-icon">🛡</span> Review <span class="nav-tag" id="review-count"></span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-chip"><span id="me-role" class="badge">…</span><span class="em" id="me-email"></span></div>
+      <button class="btn small" id="logout-btn" style="width:100%">Sign out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ASK -->
+    <section id="ask" class="screen visible">
+      <div class="eyebrow">General consulting</div>
+      <h1>Ask the Workbench</h1>
+      <p class="lede">Answers are grounded in the reviewer-approved knowledge base. Every answer cites what it relied on.</p>
+      <div class="ask-bar">
+        <input id="ask-input" placeholder="e.g. Do the EDPB legitimate-interest guidelines change our cookie analytics position?" maxlength="800">
+        <button class="btn primary" id="ask-btn">Ask</button>
+      </div>
+      <div id="ask-loading" class="hidden card" style="text-align:center"><span class="spin"></span> <span class="muted small">Researching…</span></div>
+      <div id="ask-result"></div>
+      <div class="section-head"><h2>💬 Your recent questions</h2></div>
+      <div id="history"></div>
+    </section>
+
+    <!-- KB -->
+    <section id="kb" class="screen">
+      <div class="eyebrow">Curated knowledge</div>
+      <h1>Knowledge Base</h1>
+      <p class="lede">Approved knowledge items, organized by DDP taxonomy. Nothing appears here without reviewer approval.</p>
+      <div id="kb-content"><span class="spin"></span></div>
+    </section>
+
+    <!-- SOURCES -->
+    <section id="sources" class="screen">
+      <div class="eyebrow">External intelligence</div>
+      <h1>Sources</h1>
+      <p class="lede">Registered regulatory sources with taxonomy classification. Propose new ones — the reviewer approves before they ground answers.</p>
+      <div class="card src-form" style="margin-bottom:22px">
+        <h3>Propose a source</h3>
+        <input id="src-title" placeholder="Title *" maxlength="300">
+        <input id="src-url" placeholder="URL (enables AI knowledge extraction)" maxlength="500">
+        <textarea class="rv" id="src-desc" placeholder="Short description / key content (helps classification & extraction)"></textarea>
+        <div style="display:flex;gap:8px">
+          <select id="src-jur" style="flex:1"></select>
+          <select id="src-inst" style="flex:1"></select>
+        </div>
+        <button class="btn primary" id="src-btn" style="margin-top:8px">Propose</button>
+      </div>
+      <div id="sources-list"><span class="spin"></span></div>
+    </section>
+
+    <!-- REVIEW (reviewer only) -->
+    <section id="review" class="screen">
+      <div class="eyebrow">Human in the loop</div>
+      <h1>Review Queue</h1>
+      <p class="lede">Your private control tower: approve knowledge into the base, curate sources, close gaps. Every action is logged.</p>
+      <div class="tabs">
+        <div class="tab active" data-rtab="items">📝 Knowledge items</div>
+        <div class="tab" data-rtab="sources">📚 Sources</div>
+        <div class="tab" data-rtab="gaps">🕳 Gap flags</div>
+        <div class="tab" data-rtab="users">👥 Users</div>
+        <div class="tab" data-rtab="manual">➕ Add knowledge</div>
+      </div>
+      <div id="rv-items"></div>
+      <div id="rv-sources" class="hidden"></div>
+      <div id="rv-gaps" class="hidden"></div>
+      <div id="rv-users" class="hidden"></div>
+      <div id="rv-manual" class="hidden">
+        <div class="card">
+          <h3>Manually curate a knowledge item</h3>
+          <p class="muted small" style="margin-bottom:8px">Goes straight to <b>approved</b> (auto-tagged per taxonomy v0.2).</p>
+          <textarea class="rv" id="manual-content" placeholder="The knowledge statement…"></textarea>
+          <button class="btn primary" id="manual-btn">Add to knowledge base</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
