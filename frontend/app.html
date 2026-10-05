@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pocket DDP Workbench</title>
-<link rel="stylesheet" href="styles.css">
+<meta http-equiv="Cache-Control" content="no-store">
+<link rel="stylesheet" href="styles.css?v=2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
@@ -56,33 +57,6 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
 </head>
 <body>
 
-<!-- ============ LOGIN ============ -->
-<div id="login" class="login-wrap hidden">
-  <div class="card login-card">
-    <div class="brand-logo" style="margin:0 auto 14px">§</div>
-    <h1 style="font-size:22px">Pocket DDP Workbench</h1>
-    <p class="muted small" style="margin-top:6px">Private legal research workbench · human-curated knowledge</p>
-    <div id="login-step-email">
-      <div class="tabs" style="justify-content:center">
-        <div class="tab" data-lm="magic">✉️ Magic link</div>
-        <div class="tab active" data-lm="password">🔑 Password</div>
-      </div>
-      <input id="login-email" type="email" placeholder="your@email.com" autocomplete="email">
-      <input id="login-password" type="password" placeholder="Password (min 6 chars)" autocomplete="current-password" class="hidden">
-      <div id="login-fields-pw" class="hidden">
-        <input id="login-password2" type="password" placeholder="Repeat password" autocomplete="new-password">
-      </div>
-      <button class="btn primary" style="width:100%" id="login-btn">Sign in</button>
-      <p class="muted small" style="margin-top:8px" id="login-mode-hint">New here? Same form — just pick a password and you're in.</p>
-    </div>
-    <div id="login-step-sent" class="hidden">
-      <p style="margin:18px 0" class="muted">✉️ Check your inbox — click the magic link to sign in.</p>
-      <button class="btn small" id="login-back">Use another email</button>
-    </div>
-    <p id="login-msg" class="small" style="margin-top:14px; min-height:18px"></p>
-  </div>
-</div>
-
 <!-- ============ APP ============ -->
 <div id="app" class="app hidden">
   <aside class="sidebar">
@@ -105,6 +79,7 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
     </div>
   </aside>
 
+  <div style="position:fixed;top:14px;right:18px;z-index:50;font-size:12px;color:var(--muted)" id="lb-corner">…</div>
   <main class="main">
     <!-- ASK -->
     <section id="ask" class="screen visible">
@@ -176,6 +151,6 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
   </main>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

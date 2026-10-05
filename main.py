@@ -465,7 +465,7 @@ async def review_action(req: ReviewAction, request: Request):
     after = admin.table(table).select("*").eq("id", req.id).execute().data
     admin.table("review_log").insert({
         "reviewer_id": prof["id"], "action": req.action, "entity_type": req.entity,
-        "entity_id": req.id, "before_state": before[0], "after_state": (after or [{}])[0],
+        "entity_id": req.id, "before_state": before, "after_state": (after or [{}])[0],
         "notes": req.notes,
     }).execute()
     return {"ok": True, "entity": (after or [None])[0]}
@@ -520,8 +520,10 @@ async def set_role(request: Request):
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 if not FRONTEND_DIR.exists():
     FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+from fastapi.responses import RedirectResponse
+
 if FRONTEND_DIR.exists():
     @app.get("/")
     async def root():
-        return FileResponse(FRONTEND_DIR / "index.html")
+        return RedirectResponse("/login.html", status_code=302)
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

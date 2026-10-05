@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pocket DDP Workbench — Sign in</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; }
+.login-card { width:400px; max-width:92vw; text-align:center; padding:28px 24px; }
+.login-card input { width:100%; padding:13px 15px; border-radius:11px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:15px; margin:10px 0; outline:none; }
+.login-card input:focus { border-color: var(--blue); }
+.hidden { display:none !important; }
+.err { color: var(--red); min-height: 18px; }
+.ok { color: var(--green); }
+@media (max-width:480px){ .login-card{padding:18px 14px} }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="card login-card">
+    <div class="brand-logo" style="margin:0 auto 14px">§</div>
+    <h1 style="font-size:22px">Pocket DDP Workbench</h1>
+    <p class="muted small" style="margin:6px 0 14px">Private legal research workbench · human-curated knowledge</p>
+
+    <input id="email" type="email" placeholder="email" autocomplete="email" style="text-align:left">
+    <input id="pw" type="password" placeholder="password (min 6 characters)" autocomplete="current-password" style="text-align:left">
+    <input id="pw2" type="password" placeholder="repeat password (new accounts)" autocomplete="new-password" style="text-align:left">
+    <button class="btn primary" style="width:100%;margin-top:6px" id="go">Sign in / Sign up</button>
+    <p class="err small" id="msg"></p>
+    <p class="muted small" id="explain" style="margin-top:6px">One form does both: existing account → sign in, new account → sign up (instant, no email confirmation).</p>
+  </div>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let SB = null;
+
+(async function boot() {
+  try {
+    const cfg = await (await fetch("/api/config")).json();
+    SB = supabase.createClient(cfg.supabase_url, cfg.anon_key, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    });
+    const { data } = await SB.auth.getSession();
+    if (data?.session) { location.replace("/app.html"); return; }
+    wire();
+  } catch (e) {
+    show("Backend unreachable: " + e.message);
+  }
+})();
+
+function wire() {
+  const enter = (ev) => { if (ev.key === "Enter") go(); };
+  $("#email").addEventListener("keydown", enter);
+  $("#pw").addEventListener("keydown", enter);
+  $("#pw2").addEventListener("keydown", enter);
+  $("#go").addEventListener("click", go);
+}
+
+async function go() {
+  const email = $("#email").value.trim();
+  const pw = $("#pw").value;
+  const pw2 = $("#pw2").value;
+  if (!email || !pw) { show("Enter your email and a password."); return; }
+  if (pw.length < 6) { show("Password must be at least 6 characters."); return; }
+  busy(true); show("");
+  try {
+    let res = await SB.auth.signInWithPassword({ email, password: pw });
+    if (res.error) {
+      // unknown account or wrong password → try sign-up (only if confirm fields plausible)
+      if (!pw2 || pw2 !== pw) {
+        show("Wrong password for existing account — or, to create it, repeat the same password below.");
+        busy(false); return;
+      }
+      res = await SB.auth.signUp({ email, password: pw });
+      if (res.error) throw res.error;
+      if (!res.data?.session) {
+        show("Account created. Sign-in blocked (check confirmation settings)", "ok");
+        busy(false); return;
+      }
+    }
+    show("✓ Signed in — opening the workbench…", "ok");
+    location.replace("/app.html");
+  } catch (e) {
+    show(e.message || String(e));
+  }
+  busy(false);
+}
+function busy(b) { $("#go").disabled = b; $("#go").textContent = b ? "Working…" : "Sign in / Sign up"; }
+function show(t, cls) { const m = $("#msg"); m.textContent = t; m.className = "small " + (cls || "err"); }
+</script>
+</body>
+</html>

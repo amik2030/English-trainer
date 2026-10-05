@@ -36,7 +36,14 @@
 
   // ---------- boot ----------
   async function boot() {
-    const cfg = await (await fetch("/api/config")).json();
+    let cfg;
+    try {
+      const r = await fetch("/api/config?v=" + Date.now(), { cache: "no-store" });
+      cfg = await r.json();
+    } catch (e) {
+      alert("Backend unreachable (" + e.message + "). Refresh in a minute.");
+      return;
+    }
     SB = supabase.createClient(cfg.supabase_url, cfg.anon_key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
     const { data } = await SB.auth.getSession();
     if (data?.session) { await enterApp(); } else { showLogin(); }
@@ -46,18 +53,21 @@
     });
   }
 
-  function showLogin() {
-    $("#login").classList.remove("hidden");
-    $("#app").classList.add("hidden");
-  }
+  function showLogin() { location.replace("/login.html"); }
 
   async function enterApp() {
-    try { ME = await api("/api/me"); } catch (e) { showLogin(); return; }
+    try { ME = await api("/api/me"); } catch (e) {
+      console.error("enterApp failed:", e);
+      alert("Login OK but profile load failed: " + e.message);
+      showLogin(); return;
+    }
     $("#login").classList.add("hidden");
     $("#app").classList.remove("hidden");
     $("#me-email").textContent = ME.email;
     $("#me-role").textContent = ME.role === "reviewer" ? "🛡 reviewer" : "👤 user";
     $("#me-role").className = "badge " + (ME.role === "reviewer" ? "purple" : "blue");
+    const lb = $("#lb-corner");
+    if (lb) { lb.innerHTML = "signed in as <b style='color:var(--text)'>" + ME.email.replace(/</g, "&lt;") + "</b> · " + (ME.role === "reviewer" ? "🛡 reviewer" : "👤 user"); }
     if (ME.role === "reviewer") $("#nav-review").classList.remove("hidden");
     TAX = await api("/api/taxonomy").catch(() => null);
     fillSourceFormSelects();
@@ -65,50 +75,7 @@
     await Promise.all([loadHistory(), loadSources(), ME.role === "reviewer" ? loadQueue() : Promise.resolve()]);
   }
 
-  // ---------- login ----------
-  let loginMode = "password"; // password | magic
-  $$("#login [data-lm]").forEach((t) => t.addEventListener("click", () => {
-    loginMode = t.dataset.lm;
-    $$("#login [data-lm]").forEach((x) => x.classList.toggle("active", x === t));
-    $("#login-password").classList.toggle("hidden", loginMode !== "password");
-    $("#login-fields-pw").classList.toggle("hidden", loginMode !== "password");
-    $("#login-btn").textContent = loginMode === "password" ? "Sign in" : "Send magic link";
-  }));
-
-  $("#login-btn")?.addEventListener("click", async () => {
-    const email = $("#login-email").value.trim();
-    if (!email) return;
-    $("#login-msg").textContent = "";
-    $("#login-btn").disabled = true;
-    try {
-      if (loginMode === "password") {
-        const pw = $("#login-password").value;
-        const pw2 = $("#login-password2").value;
-        if (pw.length < 6) throw new Error("Password must be at least 6 characters");
-        // try sign-in first; if no account, sign-up
-        let r = await SB.auth.signInWithPassword({ email, password: pw });
-        if (r.error) {
-          if (pw !== pw2) throw new Error("Passwords don't match");
-          r = await SB.auth.signUp({ email, password: pw });
-          if (r.error) throw r.error;
-        }
-      } else {
-        const { error } = await SB.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-        if (error) throw error;
-        $("#login-step-email").classList.add("hidden");
-        $("#login-step-sent").classList.remove("hidden");
-      }
-    } catch (e) {
-      $("#login-msg").textContent = "❌ " + e.message;
-    }
-    $("#login-btn").disabled = false;
-  });
-  $("#login-back")?.addEventListener("click", () => {
-    $("#login-step-sent").classList.add("hidden");
-    $("#login-step-email").classList.remove("hidden");
-  });
-  $("#logout-btn")?.addEventListener("click", () => SB.auth.signOut());
-
+  // login moved to /login.html
   // ---------- nav ----------
   function wireNav() {
     $$(".nav-link").forEach((a) => a.addEventListener("click", (e) => {
@@ -154,6 +121,7 @@
     const q = $("#ask-input").value.trim();
     if (!q) return;
     $("#ask-input").value = "";
+    $("#ask-btn").disabled = true; $("#ask-btn").textContent = "Researching…";
     $("#ask-loading").classList.remove("hidden");
     $("#ask-result").innerHTML = "";
     try {
@@ -165,6 +133,7 @@
       $("#ask-result").innerHTML = `<div class="card" style="color:var(--red)">❌ ${esc(e.message)}</div>`;
     }
     $("#ask-loading").classList.add("hidden");
+    $("#ask-btn").disabled = false; $("#ask-btn").textContent = "Ask";
   }
 
   async function loadHistory() {
