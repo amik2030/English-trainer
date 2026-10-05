@@ -25,7 +25,11 @@
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: "***" + token } : {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
-    if (res.status === 401) { showLogin(); throw new Error("session expired"); }
+    if (res.status === 401) {
+      try { await SB.auth.signOut(); } catch (e) {}
+      location.replace("/login.html?expired=1");
+      throw new Error("session expired");
+    }
     if (!res.ok) {
       let d = "request failed";
       try { d = (await res.json()).detail || d; } catch (e) {}
