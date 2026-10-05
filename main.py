@@ -530,7 +530,8 @@ class NoCacheStatic(BaseHTTPMiddleware):
         path = request.url.path
         if ("html" in ct or "javascript" in ct or "css" in ct or path in ("/", "/login.html", "/app.html")):
             resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            resp.headers.pop("ETag", None)
+            if "etag" in resp.headers:
+                del resp.headers["etag"]
         return resp
 
 app.add_middleware(NoCacheStatic)
