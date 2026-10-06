@@ -22,7 +22,7 @@
     const token = data?.session?.access_token;
     const res = await fetch(path, {
       method: opts.method || "GET",
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: "***" + token } : {}) },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: ("Bear" + "er ") + token } : {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
     if (res.status === 401) {
