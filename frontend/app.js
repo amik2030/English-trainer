@@ -96,7 +96,7 @@
       try { await SB.auth.signOut(); } catch (e) {}
       location.replace("/login.html");
     };
-    $$(".nav-link")forEach((a) => a.addEventListener("click", (e) => {
+    $$(".nav-link").forEach((a) => a.addEventListener("click", (e) => {
       e.preventDefault();
       const id = a.dataset.screen;
       $$(".nav-link").forEach((x) => x.classList.remove("active"));
