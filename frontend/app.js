@@ -373,31 +373,206 @@
     $("#src-btn").disabled = false;
   });
 
-  // ---------- KB ----------
+  // ---------- KB — KNOWLEDGE NAVIGATOR ----------
+  const KB = { items: [], sources: [], node: null, search: "", jur: "" };
+
+  function countUnder(prefix) {
+    // direct = tagged with exactly this node; total = tagged with this node or any descendant
+    let direct = 0, total = 0, srcTot = 0;
+    const pfx = prefix + ".";
+    for (const it of KB.items) {
+      const ids = it.taxonomy_ids || [];
+      if (ids.some((i) => i === prefix)) direct++;
+      if (ids.some((i) => i === prefix || String(i).startsWith(pfx))) total++;
+    }
+    for (const s of KB.sources) {
+      const ids = s.taxonomy_ids || [];
+      if (ids.some((i) => i === prefix || String(i).startsWith(pfx))) srcTot++;
+    }
+    return { direct, total, srcTot };
+  }
+
+  function nodeChildren(prefix) {
+    const kids = [];
+    const pfx = prefix + ".";
+    const seen = {};
+    for (const id of Object.keys(TAX?.nodes || {})) {
+      if (!id.startsWith(pfx)) continue;
+      const rest = id.slice(pfx.length);
+      if (rest.includes(".")) continue;           // grandchild
+      const selfId = TAX.nodes[prefix];
+      // only show children that exist in taxonomy (id already does)
+      kids.push(id);
+      seen[id] = true;
+    }
+    return kids.sort();
+  }
+
+  function kbCntClass(total, direct) {
+    if (direct >= 5) return "g"; if (direct >= 1) return "a"; return "";
+  }
+
+  function kbNodeRow(id, activeId) {
+    const label = TAX?.nodes?.[id] || id;
+    const c = countUnder(id);
+    const cls = c.total >= 5 ? "g" : c.total >= 1 ? "a" : "";
+    const active = id === activeId ? " active" : "";
+    const empty = c.total === 0 ? ' style="opacity:.55"' : "";
+    return `<div class="kb-node"${empty}><div class="kb-node-link${active}" data-node="${esc(id)}" title="${esc(label)}">
+      <span>${esc(label.length > 34 ? label.slice(0, 32) + "…" : label)}</span>
+      <span class="cnt ${cls}">${c.total ? c.total : "–"}</span>
+    </div><div class="kb-node-children" data-parent="${esc(id)}"></div></div>`;
+  }
+
+  function kbRenderTree(activeId) {
+    const tree = $("#kb-tree");
+    if (!TAX) { tree.innerHTML = ""; return; }
+    const tops = ["A", "B", "C", "Z"].filter((t) => TAX.nodes[t]);
+    // Helper: node path parts for a dotted id (A.3.4 → [A, A.3, A.3.4])
+    const anc = (id) => {
+      const parts = id.split("."), out = [];
+      for (let i = 0; i < parts.length; i++) out.push(parts.slice(0, i + 1).join("."));
+      return out;
+    };
+    const openSet = new Set();
+    if (activeId) for (const a of anc(activeId)) openSet.add(a);
+    const renderLevel = (prefix, depth) => {
+      const kids = nodeChildren(prefix);
+      if (!kids.length) return "";
+      return kids.map((k) => {
+        const row = kbNodeRow(k, activeId);
+        const open = openSet.has(k) || (activeId && activeId.startsWith(k + "."));
+        const childHtml = open ? renderLevel(k, depth + 1) : "";
+        return row.replace('<div class="kb-node-children" data-parent="' + esc(k) + '"></div>',
+                           '<div class="kb-node-children" data-parent="' + esc(k) + '">' + childHtml + "</div>");
+      }).join("");
+    };
+    let html = tops.map((t) => {
+      const row = kbNodeRow(t, activeId);
+      const open = openSet.has(t) || (activeId && activeId.startsWith(t + ".")) || !activeId;
+      const childHtml = open ? renderLevel(t, 1) : "";
+      return row.replace('<div class="kb-node-children" data-parent="' + esc(t) + '"></div>',
+                         '<div class="kb-node-children" data-parent="' + esc(t) + '">' + childHtml + "</div>");
+    }).join("");
+    if (KB.search) {
+      const matches = kbSearchItems();
+      const byNode = {};
+      matches.forEach((it) => { (it.taxonomy_ids || ["Z"]).forEach((t) => { (byNode[t] = byNode[t] || []).push(it); }); });
+      const mnodes = Object.keys(byNode).sort();
+      if (mnodes.length) {
+        html += `<div class="kb-node"><div class="kb-node-link" style="font-weight:700;color:var(--muted);cursor:default">search matches</div>` +
+          mnodes.map((t) => `<div class="kb-node-link${t === (KB.node || "") ? " active" : ""}" data-node="${esc(t)}"><span>${esc(TAX?.nodes?.[t] || t)}</span><span class="cnt ${kbCntClass(0, byNode[t].length)}">${byNode[t].length}</span></div>`).join("") + "</div>";
+      }
+    }
+    tree.innerHTML = html;
+    tree.querySelectorAll(".kb-node-link[data-node]").forEach((el) =>
+      el.addEventListener("click", () => kbSelect(el.dataset.node)));
+  }
+
+  function kbSearchItems() {
+    const q = KB.search.toLowerCase();
+    return KB.items.filter((it) =>
+      (it.content || "").toLowerCase().includes(q)
+      || (it.tags || []).some((t) => t.toLowerCase().includes(q))
+      || (it.sources?.title || "").toLowerCase().includes(q)
+      || ((it.taxonomy_ids || []).some((t) => (TAX?.nodes?.[t] || t).toLowerCase().includes(q))));
+  }
+
+  function kbItemsFor(nodeId) {
+    const pfx = nodeId + ".";
+    let items = KB.items.filter((it) => (it.taxonomy_ids || []).some((i) => i === nodeId || String(i).startsWith(pfx)));
+    if (KB.jur) {
+      items = items.filter((it) => {
+        const srcJur = it.sources?.jurisdiction || (it.source_jur || "");
+        return srcJur === KB.jur;
+      });
+    }
+    if (KB.search) items = kbSearchItems().filter((it) => items.includes(it));
+    return items;
+  }
+
+  function kbNoteCard(it) {
+    const ids = (it.taxonomy_ids || []).map((t) => `<span class="badge blue">${esc(t)}${TAX?.nodes?.[t] ? " · " + esc(TAX.nodes[t]) : ""}</span>`).join("");
+    const tags = (it.tags || []).map((t) => `<span class="badge">#${esc(t)}</span>`).join("");
+    const src = it.sources?.title ? `<span class="from">💡 from: <b>${esc(it.sources.title)}</b>${it.sources?.url ? ` · <a href="${esc(it.sources.url)}" target="_blank">open source ↗</a>` : ""}</span>` : (it.origin_note ? `<span class="from">💡 ${esc(it.origin_note)}</span>` : "");
+    return `<div class="kb-note-card">
+      <div class="qa-a">${esc(it.content)}</div>
+      <div class="qa-meta" style="margin-top:8px">${ids}${tags}</div>
+      ${src ? `<div style="margin-top:8px">${src}</div>` : ""}
+      ${it.reviewed_at ? `<div class="from" style="margin-top:4px">✅ reviewer-approved ${new Date(it.reviewed_at).toLocaleDateString()}${it.reviewed_by ? " · " + esc(it.reviewed_by) : ""}</div>` : ""}
+    </div>`;
+  }
+
+  function kbRenderContent() {
+    const el = $("#kb-content");
+    const gov = KB.jur;   // governance lens = jurisdiction
+    let items, context = "";
+    if (KB.search) {
+      items = kbSearchItems();
+      if (KB.jur) items = items.filter((it) => (it.sources?.jurisdiction || it.source_jur || "") === KB.jur);
+    } else if (KB.node) {
+      items = kbItemsFor(KB.node);
+    } else {
+      items = KB.items.slice();
+      if (KB.jur) items = items.filter((it) => (it.sources?.jurisdiction || it.source_jur || "") === KB.jur);
+    }
+    if (KB.node && !KB.search && !items.length) {
+      el.innerHTML = `<div class="card" style="border-left:4px solid var(--amber,#d29922)">
+        <h3 style="margin:0 0 6px">${esc(TAX?.nodes?.[KB.node] || KB.node)}</h3>
+        <p class="muted">No knowledge notes in this area yet.</p>
+        <p class="muted small">${ME?.role === "reviewer"
+          ? 'Use 🛡 Review → “Add knowledge”, tag it ' + esc(KB.node) + ', or extract knowledge from an approved source covering this area.'
+          : 'Ask a question in ⚡ Ask — if the KB can\'t answer, it lands in the curation backlog.'}</p>
+      </div>`;
+      return;
+    }
+    const label = KB.node ? (TAX?.nodes?.[KB.node] || KB.node) : (KB.search ? `search: “${esc(KB.search)}”` : "All knowledge");
+    const srcs = new Set(items.map((it) => it.sources?.title).filter(Boolean));
+    const head = `<div class="kb-ann-head">
+      <h2 style="margin:0">${label}</h2>
+      <span class="badge">${items.length} notes</span>
+      <span class="badge blue">${srcs.size} sources</span>
+    </div>`;
+    el.innerHTML = head + (items.length ? items.map(kbNoteCard).join("") : '<p class="muted">No matches. Try clearing the search or jurisdiction lens.</p>');
+  }
+
+  function kbRenderCrumb() {
+    const cr = $("#kb-crumb");
+    if (!KB.node || KB.search) { cr.classList.add("hidden"); cr.innerHTML = ""; return; }
+    const parts = KB.node.split(".");
+    let chain = [], acc = [];
+    for (const p of parts) { acc.push(p); chain.push(acc.join(".")); }
+    cr.innerHTML = '<a data-node="">🧭 Home</a>' + chain.map((c, i) =>
+      ` <span class="sep">›</span> ${i === chain.length - 1 ? `<b>${esc(TAX?.nodes?.[c] || c)}</b>` : `<a data-node="${esc(c)}">${esc(TAX?.nodes?.[c] || c)}</a>`}`).join("")
+      + (KB.jur ? ` <span class="sep">·</span> 🌐 <b>${esc(KB.jur)}</b>` : "");
+    cr.classList.remove("hidden");
+    cr.querySelectorAll("a[data-node]").forEach((a) => a.addEventListener("click", () => kbSelect(a.dataset.node || "")));
+  }
+
+  function kbSelect(nodeId) {
+    KB.node = nodeId || null;
+    if (nodeId) KB.search = "", $("#kb-search").value = "";
+    kbRenderTree(KB.node);
+    kbRenderCrumb();
+    kbRenderContent();
+  }
+
   async function loadKB() {
     try {
       const r = await api("/api/kb");
-      const groups = {};
-      for (const it of r.knowledge_items) {
-        const dom = (it.taxonomy_ids?.[0] || "Z").split(".")[0];
-        (groups[dom] = groups[dom] || []).push(it);
+      KB.items = r.knowledge_items || [];
+      KB.sources = r.sources || [];
+      // jurisdiction lens options from approved sources
+      const jurs = [...new Set(KB.sources.map((s) => s.jurisdiction).filter(Boolean))].sort();
+      const cur = KB.jur;
+      $("#kb-jur").innerHTML = '<option value="">🌐 All jurisdictions</option>' + jurs.map((j) => `<option${j === cur ? " selected" : ""}>${j}</option>`).join("");
+      if (!KB._wiredSearch) {
+        KB._wiredSearch = true;
+        $("#kb-search").addEventListener("input", () => { KB.search = $("#kb-search").value.trim(); kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); });
+        $("#kb-jur").addEventListener("change", () => { KB.jur = $("#kb-jur").value; kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); });
       }
-      const domNames = { A: "A · Data Protection & Privacy", B: "B · AI & Digital Regulation", C: "C · Information Governance", Z: "Z · Unclassified" };
-      let html = `<p class="muted small" style="margin-bottom:18px">${r.knowledge_items.length} approved knowledge items · ${r.sources.length} approved sources</p>`;
-      for (const dom of ["A", "B", "C", "Z"]) {
-        if (!groups[dom]) continue;
-        html += `<div class="kb-group"><h2>${domNames[dom] || dom}</h2>` + groups[dom].map((it) => `
-          <div class="card" style="margin-bottom:10px">
-            <div class="qa-a">${esc(it.content)}</div>
-            <div class="qa-meta">
-              ${(it.taxonomy_ids || []).map((t) => `<span class="badge blue">${esc(t)}</span>`).join("")}
-              ${(it.tags || []).map((t) => `<span class="badge">#${esc(t)}</span>`).join("")}
-              ${it.sources?.title ? `<span class="cit">from: <b>${esc(it.sources.title)}</b></span>` : ""}
-            </div>
-          </div>`).join("") + `</div>`;
-      }
-      if (!r.knowledge_items.length) html += '<p class="muted">Knowledge base is empty — propose sources and let the reviewer extract knowledge.</p>';
-      $("#kb-content").innerHTML = html;
+      if (!KB.node && !KB.search) { kbRenderTree(""); kbRenderContent(); }
+      else { kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); }
     } catch (e) { $("#kb-content").innerHTML = `<p style="color:var(--red)">${esc(e.message)}</p>`; }
   }
 
