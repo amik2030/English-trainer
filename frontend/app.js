@@ -90,7 +90,13 @@
   // login moved to /login.html
   // ---------- nav ----------
   function wireNav() {
-    $$(".nav-link").forEach((a) => a.addEventListener("click", (e) => {
+    const lo = $("#logout-btn");
+    if (lo) lo.onclick = async () => {
+      lo.disabled = true; lo.textContent = "Signing out…";
+      try { await SB.auth.signOut(); } catch (e) {}
+      location.replace("/login.html");
+    };
+    $$(".nav-link")forEach((a) => a.addEventListener("click", (e) => {
       e.preventDefault();
       const id = a.dataset.screen;
       $$(".nav-link").forEach((x) => x.classList.remove("active"));
