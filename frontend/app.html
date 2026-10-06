@@ -19,6 +19,31 @@
 .scope-bar select:focus, .scope-bar input[type=text]:focus { border-color: var(--blue); }
 .scope-bar .btn.tiny { padding:6px 10px; font-size:12px; }
 .scope-active-hint { font-size:12px; color:var(--muted); margin:-18px 0 24px; }
+/* Sources page: stats + filters */
+.src-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:0 0 18px; }
+.src-stat { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 16px; position:relative; overflow:hidden; }
+.src-stat::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--blue); opacity:.8; }
+.src-stat.green::before { background:#3fb950; }
+.src-stat.amber::before { background:#d29922; }
+.src-stat.purple::before { background:#a371f7; }
+.src-stat.red::before { background:#f85149; }
+.src-stat .num { font-size:26px; font-weight:800; color:var(--text); line-height:1.1; }
+.src-stat .lbl { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-top:3px; }
+.src-stat .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+.src-bars { display:flex; flex-direction:column; gap:6px; margin:0 0 18px; background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 16px; }
+.src-bars h4 { margin:0 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+.src-bar-row { display:grid; grid-template-columns:90px 1fr 28px; align-items:center; gap:8px; font-size:12px; }
+.src-bar-row .bl { color:var(--muted); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.src-bar-track { background:var(--bg2); border-radius:6px; height:10px; overflow:hidden; }
+.src-bar-fill { height:100%; border-radius:6px; background:linear-gradient(90deg,rgba(79,140,255,.9),rgba(163,113,247,.9)); }
+.src-bar-row .bn { color:var(--text); font-weight:700; }
+.src-filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 8px; padding:10px 12px; border:1px dashed var(--border); border-radius:12px; background:rgba(163,113,247,.04); }
+.src-filters select, .src-filters input[type=text] { padding:7px 10px; border-radius:9px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:13px; outline:none; max-width:170px; }
+.src-filters input[type=text] { max-width:170px; }
+.src-filters select:focus, .src-filters input:focus { border-color: var(--blue); }
+.src-jur-chip { cursor:pointer; }
+.src-jur-chip.sel { border:1px solid rgba(79,140,255,.6); background:rgba(79,140,255,.15); color:var(--text); }
+.src-count-line { font-size:12px; color:var(--muted); margin:6px 0 16px; }
 .btn { padding:12px 20px; border-radius:11px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-weight:600; font-size:14px; cursor:pointer; transition:all .15s; }
 .btn:hover { border-color: var(--blue); }
 .btn.primary { background:linear-gradient(135deg, var(--blue), var(--purple)); border:none; color:#fff; }
@@ -138,6 +163,38 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
       <div class="eyebrow">External intelligence</div>
       <h1>Sources</h1>
       <p class="lede">Registered regulatory sources with taxonomy classification. Propose new ones — the reviewer approves before they ground answers.</p>
+
+      <div class="src-stats" id="src-stats"></div>
+
+      <div class="src-filters" id="src-filters">
+        <span class="scope-label">🔍 Filter</span>
+        <input type="text" id="srcf-search" placeholder="Search title / body…" maxlength="60">
+        <select id="srcf-jur"><option value="">All jurisdictions</option></select>
+        <select id="srcf-area"><option value="">All legal areas</option></select>
+        <select id="srcf-inst"><option value="">All instruments</option></select>
+        <select id="srcf-status">
+          <option value="">All statuses</option>
+          <option value="approved">Approved</option>
+          <option value="proposed">Proposed</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select id="srcf-origin">
+          <option value="">All origins</option>
+          <option value="external">External (public)</option>
+          <option value="internal">Internal (company)</option>
+        </select>
+        <select id="srcf-tstatus">
+          <option value="">All doc statuses</option>
+          <option value="IN_FORCE">In force</option>
+          <option value="DRAFT">Draft</option>
+          <option value="PROPOSED">Proposed</option>
+          <option value="SUPERSEDED">Superseded</option>
+          <option value="REPEALED">Repealed</option>
+        </select>
+        <button class="btn tiny" id="srcf-clear">Clear</button>
+      </div>
+      <p class="scope-active-hint hidden" id="srcf-hint"></p>
+
       <div class="card src-form" style="margin-bottom:22px">
         <h3>Propose a source</h3>
         <input id="src-title" placeholder="Title *" maxlength="300">
@@ -180,6 +237,6 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
   </main>
 </div>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

@@ -224,26 +224,135 @@
     hint.classList.remove("hidden");
   }
 
+  const JUR_FLAGS = { EU: "🇪🇺", UK: "🇬🇧", CH: "🇨🇭", INTL: "🌐", DE: "🇩🇪", FR: "🇫🇷", IT: "🇮🇹", AT: "🇦🇹", ES: "🇪🇸", NL: "🇳🇱", BE: "🇧🇪", US: "🇺🇸" };
+  const AREA_LABELS = { A: "Data Protection", B: "AI & Digital", C: "Info Governance", Z: "Unclassified" };
+
   function srcCard(s) {
     const st = { proposed: "amber", approved: "green", rejected: "red" }[s.status] || "";
+    const cls = s.classification || {};
     const tags = (s.tags || []).map((t) => `<span class="badge">#${esc(t)}</span>`).join("");
-    const ids = (s.taxonomy_ids || []).map((t) => `<span class="badge blue">${esc(t)}${s.taxonomy_labels?.[t] ? " · " + esc(s.taxonomy_labels[t]) : ""}</span>`).join("");
-    const conf = s.classification?.confidence ? `<span class="badge">conf ${Math.round(s.classification.confidence * 100) / 100}</span>` : "";
+    const ids = (s.taxonomy_ids || []).map((t) => `<span class="badge blue" title="${esc(TAX?.nodes?.[t] || t)}">${esc(t)}${TAX?.nodes?.[t] ? " · " + esc(TAX.nodes[t]) : ""}</span>`).join("");
+    const conf = cls.confidence ? `<span class="badge" title="Classification confidence">conf ${Math.round(cls.confidence * 100) / 100}</span>` : "";
+    const jur = s.jurisdiction || "INTL";
+    const temporal = cls.temporal_status && cls.temporal_status !== "IN_FORCE" ? `<span class="badge amber">${esc(cls.temporal_status.replace("_", " ").toLowerCase())}</span>` : "";
+    const origin = cls.origin === "internal" ? '<span class="badge purple">internal</span>' : "";
+    const body = cls.issuing_body ? `<span class="badge">🏛 ${esc(cls.issuing_body)}</span>` : "";
+    const reviewed = s.reviewed_at ? `<span class="muted small">reviewed ${new Date(s.reviewed_at).toLocaleDateString()}</span>` : "";
     return `<div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <h3 style="margin:0">${s.url ? `<a href="${esc(s.url)}" target="_blank" style="color:var(--text)">${esc(s.title)}</a>` : esc(s.title)}</h3>
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+        <div style="display:flex;gap:10px;align-items:flex-start;min-width:0">
+          <span style="font-size:22px;line-height:1.2">${JUR_FLAGS[jur] || "🌐"}</span>
+          <div style="min-width:0">
+            <h3 style="margin:0">${s.url ? `<a href="${esc(s.url)}" target="_blank" style="color:var(--text)">${esc(s.title)}</a>` : esc(s.title)}</h3>
+            ${cls.description ? `<p class="muted small" style="margin:4px 0 0">${esc(cls.description.slice(0, 220))}${cls.description.length > 220 ? "…" : ""}</p>` : ""}
+          </div>
+        </div>
         <span class="badge ${st}">${esc(s.status)}</span>
       </div>
-      <div style="margin-top:8px">${ids}${tags}${conf}<span class="badge">${esc(s.jurisdiction || "INTL")}</span><span class="badge purple">${esc(s.instrument || "")}</span></div>
-      ${s.classification?.rationale ? `<p class="muted small" style="margin-top:8px">${esc(s.classification.rationale)}</p>` : ""}
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${ids}${tags}${conf}<span class="badge">${JUR_FLAGS[jur] || ""} ${esc(jur)}</span><span class="badge purple">${esc((s.instrument || "").replace("_", " ").toLowerCase())}</span>${temporal}${origin}${body}
+        ${reviewed ? `<span style="margin-left:auto">${reviewed}</span>` : ""}
+      </div>
+      ${cls.rationale ? `<p class="muted small" style="margin-top:8px">💡 ${esc(cls.rationale)}</p>` : ""}
     </div>`;
+  }
+
+  function srcFilterState() {
+    return {
+      search: ($("#srcf-search")?.value || "").trim().toLowerCase(),
+      jur: $("#srcf-jur")?.value || "",
+      area: $("#srcf-area")?.value || "",
+      inst: $("#srcf-inst")?.value || "",
+      status: $("#srcf-status")?.value || "",
+      origin: $("#srcf-origin")?.value || "",
+      tstatus: $("#srcf-tstatus")?.value || "",
+    };
+  }
+
+  function srcInFilter(s, f) {
+    if (f.search) {
+      const hay = ((s.title || "") + " " + ((s.classification || {}).issuing_body || "") + " " + ((s.classification || {}).description || "") + " " + ((s.classification || {}).rationale || "")).toLowerCase();
+      if (!hay.includes(f.search)) return false;
+    }
+    if (f.jur && (s.jurisdiction || "INTL") !== f.jur) return false;
+    if (f.area && !(s.taxonomy_ids || []).some((i) => String(i).toUpperCase() === f.area || String(i).toUpperCase().startsWith(f.area + "."))) return false;
+    if (f.inst && (s.instrument || "") !== f.inst) return false;
+    if (f.status && s.status !== f.status) return false;
+    if (f.origin && String(((s.classification || {}).origin) || "external") !== f.origin) return false;
+    if (f.tstatus && String(((s.classification || {}).temporal_status) || "IN_FORCE") !== f.tstatus) return false;
+    return true;
+  }
+
+  function renderSourceStats(rows) {
+    const approved = rows.filter((s) => s.status === "approved").length;
+    const proposed = rows.filter((s) => s.status === "proposed").length;
+    const rejected = rows.filter((s) => s.status === "rejected").length;
+    const byJur = {};
+    rows.forEach((s) => { const j = s.jurisdiction || "INTL"; byJur[j] = (byJur[j] || 0) + 1; });
+    const byArea = {};
+    rows.forEach((s) => { const a = ((s.taxonomy_ids || [])[0] || "Z").split(".")[0]; byArea[a] = (byArea[a] || 0) + 1; });
+    const avgConf = rows.length
+      ? rows.reduce((a, s) => a + (s.classification?.confidence || 0), 0) / rows.length : 0;
+    const jurEntries = Object.entries(byJur).sort((a, b) => b[1] - a[1]);
+    const maxJur = Math.max(1, ...jurEntries.map(([, n]) => n));
+    $("#src-stats").innerHTML = `
+      <div class="src-stat"><div class="num">${rows.length}</div><div class="lbl">Total sources</div><div class="sub">${jurEntries.length} jurisdictions</div></div>
+      <div class="src-stat green"><div class="num">${approved}</div><div class="lbl">Approved</div><div class="sub">grounding answers</div></div>
+      <div class="src-stat amber"><div class="num">${proposed}</div><div class="lbl">Awaiting review</div><div class="sub">${rejected ? rejected + " rejected" : "none rejected"}</div></div>
+      <div class="src-stat purple"><div class="num">${rows.length ? Math.round(avgConf * 100) : 0}%</div><div class="lbl">Avg classification</div><div class="sub">confidence</div></div>`;
+    const barRow = (label, n) => `<div class="src-bar-row"><span class="bl">${label}</span><div class="src-bar-track"><div class="src-bar-fill" style="width:${Math.round((n / maxJur) * 100)}%"></div></div><span class="bn">${n}</span></div>`;
+    let bars = `<div class="src-bars" id="src-bars"><h4>By jurisdiction</h4>${jurEntries.map(([j, n]) => barRow((JUR_FLAGS[j] || "") + " " + j, n)).join("")}</div>`;
+    const areaEntries = Object.entries(byArea).sort((a, b) => b[1] - a[1]);
+    const maxArea = Math.max(1, ...areaEntries.map(([, n]) => n));
+    bars += `<div class="src-bars" style="margin-top:-8px"><h4>By legal area</h4>${areaEntries.map(([a, n]) =>
+      `<div class="src-bar-row"><span class="bl">${a} · ${AREA_LABELS[a] || a}</span><div class="src-bar-track"><div class="src-bar-fill" style="width:${Math.round((n / maxArea) * 100)}%"></div></div><span class="bn">${n}</span></div>`).join("")}</div>`;
+    document.querySelectorAll("#sources .src-bars").forEach((el) => el.remove());
+    $("#src-stats").insertAdjacentHTML("afterend", bars);
+  }
+
+  function renderSourceList() {
+    const rows = state.sources || [];
+    renderSourceStats(rows);
+    const f = srcFilterState();
+    const filtered = rows.filter((s) => srcInFilter(s, f));
+    const active = Object.values(f).some(Boolean);
+    const hint = $("#srcf-hint");
+    if (hint) {
+      if (active) {
+        hint.textContent = `🔍 Showing ${filtered.length} of ${rows.length} sources`;
+        hint.classList.remove("hidden");
+      } else { hint.classList.add("hidden"); }
+    }
+    $("#sources-list").innerHTML = filtered.length
+      ? filtered.map(srcCard).join("")
+      : (rows.length
+        ? '<p class="muted small">No sources match the current filters.</p>'
+        : '<p class="muted small">No sources yet.</p>');
+  }
+
+  function wireSourceFilters() {
+    ["#srcf-search", "#srcf-jur", "#srcf-area", "#srcf-inst", "#srcf-status", "#srcf-origin", "#srcf-tstatus"].forEach((sel) =>
+      $(sel)?.addEventListener("input", renderSourceList));
+    $("#srcf-clear")?.addEventListener("click", () => {
+      ["#srcf-search", "#srcf-jur", "#srcf-area", "#srcf-inst", "#srcf-status", "#srcf-origin", "#srcf-tstatus"].forEach((sel) => { $(sel).value = ""; });
+      renderSourceList();
+    });
+  }
+
+  function fillSourceFilterSelects() {
+    if (!TAX) return;
+    $("#srcf-jur").innerHTML = '<option value="">All jurisdictions</option>' + TAX.jurisdictions.map((j) => `<option>${j}</option>`).join("");
+    $("#srcf-inst").innerHTML = '<option value="">All instruments</option>' + TAX.instruments.map((j) => `<option>${j}</option>`).join("");
+    $("#srcf-area").innerHTML = '<option value="">All legal areas</option>' + SCOPE_AREAS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    wireSourceFilters();
   }
 
   async function loadSources() {
     try {
       const r = await api("/api/sources");
       state.sources = r.sources;
-      $("#sources-list").innerHTML = r.sources.length ? r.sources.map(srcCard).join("") : '<p class="muted small">No sources yet.</p>';
+      fillSourceFilterSelects();
+      renderSourceList();
     } catch (e) { $("#sources-list").innerHTML = ""; }
   }
 
