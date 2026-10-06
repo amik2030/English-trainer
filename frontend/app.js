@@ -74,8 +74,7 @@
       }
       showLogin(); return;
     }
-    $("#login").classList.add("hidden");
-    $("#app").classList.remove("hidden");
+    const appEl = $("#app"); if (appEl) appEl.classList.remove("hidden");
     $("#me-email").textContent = ME.email;
     $("#me-role").textContent = ME.role === "reviewer" ? "🛡 reviewer" : "👤 user";
     $("#me-role").className = "badge " + (ME.role === "reviewer" ? "purple" : "blue");
