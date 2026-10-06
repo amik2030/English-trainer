@@ -155,8 +155,61 @@ Respond with ONLY a JSON object:
 {"answer": str, "reused": bool, "matched_qa_id": int|null, "citations": [...], "kb_grounded": bool, "confidence": float, "jurisdiction": str}"""
 
 
+class AskScope(BaseModel):
+    """Optional narrowing filters for an Ask query."""
+    jurisdiction: Optional[str] = None        # EU | UK | CH | ... (exact match on source.jurisdiction)
+    taxonomy_area: Optional[str] = None       # top-level (A/B/C) or dotted prefix (A.1) matched against taxonomy_ids
+    origin: Optional[str] = None              # external | internal (classification.origin; default external)
+    temporal_status: Optional[str] = None     # IN_FORCE | DRAFT | PROPOSED | REPEALED | SUPERSEDED
+    instrument: Optional[str] = None          # REGULATION | GUIDELINES | JUDGMENT | ...
+    issuing_body: Optional[str] = None        # free text, substring-matched vs classification.issuing_body + title
+
+
 class AskRequest(BaseModel):
     question: str
+    scope: Optional[AskScope] = None
+
+
+def _source_in_scope(s: dict, sc: Optional[AskScope]) -> bool:
+    if sc is None:
+        return True
+    if sc.jurisdiction and (s.get("jurisdiction") or "INTL").upper() != sc.jurisdiction.strip().upper():
+        return False
+    if sc.taxonomy_area:
+        pref = sc.taxonomy_area.strip().upper()
+        ids = [str(i).upper() for i in (s.get("taxonomy_ids") or [])]
+        if not any(i == pref or i.startswith(pref + ".") for i in ids):
+            return False
+    cls = s.get("classification") or {}
+    if sc.origin:
+        origin = str(cls.get("origin") or "external").lower()
+        if origin != sc.origin.strip().lower():
+            return False
+    if sc.temporal_status:
+        ts = str(cls.get("temporal_status") or "IN_FORCE").upper()
+        if ts != sc.temporal_status.strip().upper():
+            return False
+    if sc.instrument and (s.get("instrument") or "").upper() != sc.instrument.strip().upper():
+        return False
+    if sc.issuing_body:
+        hay = (str(cls.get("issuing_body") or "") + " " + str(s.get("title") or "")).lower()
+        if sc.issuing_body.strip().lower() not in hay:
+            return False
+    return True
+
+
+def _scope_summary(sc: Optional[AskScope]) -> str:
+    """Human-readable scope line for the LLM prompt; empty when unscoped."""
+    if sc is None:
+        return ""
+    parts = []
+    if sc.jurisdiction: parts.append(f"jurisdiction={sc.jurisdiction}")
+    if sc.taxonomy_area: parts.append(f"legal area={sc.taxonomy_area}")
+    if sc.origin: parts.append(f"source origin={sc.origin}")
+    if sc.temporal_status: parts.append(f"status={sc.temporal_status}")
+    if sc.instrument: parts.append(f"instrument type={sc.instrument}")
+    if sc.issuing_body: parts.append(f"issuing body contains '{sc.issuing_body}'")
+    return "SCOPE CONSTRAINTS (narrow your answer to these; say so if the KB lacks in-scope material): " + "; ".join(parts) if parts else ""
 
 
 @app.post("/api/ask")
@@ -166,15 +219,29 @@ async def ask(req: AskRequest, request: Request, background_tasks: BackgroundTas
     if not q:
         raise HTTPException(400, "question required")
 
-    ki = admin.table("knowledge_items").select("id, content, source_id, taxonomy_ids, tags") \
+    ki_all = admin.table("knowledge_items").select("id, content, source_id, taxonomy_ids, tags") \
         .eq("status", "approved").order("reviewed_at", desc=True).limit(60).execute().data or []
-    src = admin.table("sources").select("id, title, taxonomy_ids, tags, instrument, jurisdiction") \
+    src_all = admin.table("sources").select("id, title, taxonomy_ids, tags, instrument, jurisdiction, classification") \
         .eq("status", "approved").order("reviewed_at", desc=True).limit(40).execute().data or []
     qa = admin.table("qa_history").select("id, question, answer") \
         .eq("status", "answered").order("answered_at", desc=True).limit(40).execute().data or []
 
+    # apply scope filters
+    src = [s for s in src_all if _source_in_scope(s, req.scope)]
+    if req.scope is not None:
+        in_src_ids = {s["id"] for s in src}
+        pref = (req.scope.taxonomy_area or "").strip().upper()
+        ki = [k for k in ki_all
+              if k.get("source_id") in in_src_ids
+              or (pref and any(str(i).upper() == pref or str(i).upper().startswith(pref + ".")
+                               for i in (k.get("taxonomy_ids") or [])))]
+    else:
+        ki = ki_all
+
+    scope_line = _scope_summary(req.scope)
     prompt = (
-        "QUESTION:\n" + q
+        (("\n" + scope_line + "\n\n") if scope_line else "")
+        + "QUESTION:\n" + q
         + "\n\nAPPROVED KNOWLEDGE ITEMS:\n" + json.dumps([{"id": k["id"], "content": k["content"][:800],
              "taxonomy_ids": k.get("taxonomy_ids") or [], "source_id": k.get("source_id")} for k in ki], ensure_ascii=False)
         + "\n\nAPPROVED SOURCES:\n" + json.dumps([{"id": s["id"], "title": s["title"]} for s in src], ensure_ascii=False)
@@ -232,7 +299,9 @@ async def ask(req: AskRequest, request: Request, background_tasks: BackgroundTas
             background_tasks.add_task(tag_qa, row_id, q, answer)
     return {"id": row_id, "question": q, "answer": answer, "reused": reused,
             "matched_qa_id": matched, "citations": cits, "confidence": conf,
-            "jurisdiction": jur, "status": "answered"}
+            "jurisdiction": jur, "status": "answered",
+            "scope": (req.scope.dict(exclude_none=True) if req.scope else None),
+            "kb_counts": {"sources_in_scope": len(src), "items_in_scope": len(ki)}}
 
 
 QA_TAG_SYSTEM = """You are the classification engine of a Legal Research Workbench (DDP Taxonomy v0.2).

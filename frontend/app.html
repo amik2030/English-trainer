@@ -9,9 +9,16 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
-.ask-bar { display:flex; gap:10px; margin:18px 0 26px; }
+.ask-bar { display:flex; gap:10px; margin:18px 0 10px; }
 .ask-bar input { flex:1; padding:14px 16px; border-radius:12px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:15px; outline:none; }
 .ask-bar input:focus { border-color: var(--blue); }
+.scope-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 26px; padding:10px 12px; border:1px dashed var(--border); border-radius:12px; background:rgba(79,140,255,.04); }
+.scope-bar .scope-label { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; margin-right:2px; }
+.scope-bar select, .scope-bar input[type=text] { padding:7px 10px; border-radius:9px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:13px; outline:none; max-width:170px; }
+.scope-bar input[type=text] { max-width:150px; }
+.scope-bar select:focus, .scope-bar input[type=text]:focus { border-color: var(--blue); }
+.scope-bar .btn.tiny { padding:6px 10px; font-size:12px; }
+.scope-active-hint { font-size:12px; color:var(--muted); margin:-18px 0 24px; }
 .btn { padding:12px 20px; border-radius:11px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-weight:600; font-size:14px; cursor:pointer; transition:all .15s; }
 .btn:hover { border-color: var(--blue); }
 .btn.primary { background:linear-gradient(135deg, var(--blue), var(--purple)); border:none; color:#fff; }
@@ -90,6 +97,28 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
         <input id="ask-input" placeholder="e.g. Do the EDPB legitimate-interest guidelines change our cookie analytics position?" maxlength="800">
         <button class="btn primary" id="ask-btn">Ask</button>
       </div>
+      <div class="scope-bar" id="scope-bar">
+        <span class="scope-label">🎯 Scope</span>
+        <select id="scope-jur" title="Jurisdiction"><option value="">Any jurisdiction</option></select>
+        <select id="scope-area" title="Legal area"><option value="">Any legal area</option></select>
+        <select id="scope-origin" title="Source origin">
+          <option value="">Any origin</option>
+          <option value="external">External (public law)</option>
+          <option value="internal">Internal (company)</option>
+        </select>
+        <select id="scope-status" title="Document status">
+          <option value="">Any status</option>
+          <option value="IN_FORCE">In force</option>
+          <option value="DRAFT">Draft</option>
+          <option value="PROPOSED">Proposed</option>
+          <option value="SUPERSEDED">Superseded</option>
+          <option value="REPEALED">Repealed</option>
+        </select>
+        <select id="scope-inst" title="Instrument type"><option value="">Any instrument</option></select>
+        <input type="text" id="scope-body" placeholder="Issuing body…" title="Issuing body (free text)" maxlength="60">
+        <button class="btn tiny" id="scope-clear">Clear</button>
+      </div>
+      <p class="scope-active-hint hidden" id="scope-hint"></p>
       <div id="ask-loading" class="hidden card" style="text-align:center"><span class="spin"></span> <span class="muted small">Researching…</span></div>
       <div id="ask-result"></div>
       <div class="section-head"><h2>💬 Your recent questions</h2></div>

@@ -125,6 +125,8 @@
         ${q.kb_reused ? '<span class="badge green">KB reuse</span>' : ""}
         <span class="badge">confidence ${Math.round((q.confidence ?? 0) * 100) / 100}</span>
         <span class="badge">${esc(q.jurisdiction || "INTL")}</span>
+        ${q.scope ? Object.entries(q.scope).map(([k, v]) => `<span class="badge purple">🎯 ${esc(k.replace("_", " "))}: ${esc(v)}</span>`).join("") : ""}
+        ${q.kb_counts ? `<span class="badge">KB in scope: ${q.kb_counts.items_in_scope} items / ${q.kb_counts.sources_in_scope} sources</span>` : ""}
         ${tags}
       </div>
       ${cits ? `<div style="margin-top:8px">${cits}</div>` : '<div style="margin-top:8px" class="cit">↳ general legal knowledge (KB did not cover this — flagged for curation)</div>'}
@@ -143,8 +145,9 @@
     $("#ask-loading").classList.remove("hidden");
     $("#ask-result").innerHTML = "";
     try {
-      const out = await api("/api/ask", { method: "POST", body: { question: q } });
-      $("#ask-result").innerHTML = qaCard({ ...out, answered_at: new Date().toISOString(), taxonomy_ids: [] });
+      const sc = currentScope();
+      const out = await api("/api/ask", { method: "POST", body: { question: q, scope: sc } });
+      $("#ask-result").innerHTML = qaCard({ ...out, answered_at: new Date().toISOString(), taxonomy_ids: [], scope: sc });
       loadHistory();
       if (ME.role === "reviewer") loadQueue();
     } catch (e) {
@@ -168,6 +171,57 @@
     if (!TAX) return;
     $("#src-jur").innerHTML = '<option value="">Jurisdiction (auto)</option>' + TAX.jurisdictions.map((j) => `<option>${j}</option>`).join("");
     $("#src-inst").innerHTML = '<option value="">Instrument type (auto)</option>' + TAX.instruments.map((j) => `<option>${j}</option>`).join("");
+    fillScopeSelects();
+  }
+
+  // ---------- ASK SCOPE ----------
+  const SCOPE_AREAS = [
+    ["A", "A · Data Protection & Privacy"],
+    ["A.1", "A.1 · GDPR (EU)"],
+    ["A.3", "A.3 · FADP (Switzerland)"],
+    ["A.4", "A.4 · ePrivacy"],
+    ["A.5", "A.5 · International transfers"],
+    ["A.7", "A.7 · Sectoral privacy"],
+    ["A.8", "A.8 · Intl frameworks (108+)"],
+    ["B", "B · AI & Digital Regulation"],
+    ["B.1", "B.1 · EU AI Act"],
+    ["B.2", "B.2 · DSA"],
+    ["B.5", "B.5 · NIS2 & Cyber"],
+    ["C", "C · Information Governance"],
+  ];
+
+  function fillScopeSelects() {
+    if (!TAX) return;
+    $("#scope-jur").innerHTML = '<option value="">Any jurisdiction</option>' + TAX.jurisdictions.map((j) => `<option>${j}</option>`).join("");
+    $("#scope-inst").innerHTML = '<option value="">Any instrument</option>' + TAX.instruments.map((j) => `<option>${j}</option>`).join("");
+    $("#scope-area").innerHTML = '<option value="">Any legal area</option>' + SCOPE_AREAS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    ["#scope-jur", "#scope-area", "#scope-origin", "#scope-status", "#scope-inst", "#scope-body"].forEach((sel) =>
+      $(sel)?.addEventListener("input", updateScopeHint));
+    $("#scope-clear")?.addEventListener("click", () => {
+      ["#scope-jur", "#scope-area", "#scope-origin", "#scope-status", "#scope-inst", "#scope-body"].forEach((sel) => { $(sel).value = ""; });
+      updateScopeHint();
+    });
+  }
+
+  function currentScope() {
+    const sc = {};
+    const j = $("#scope-jur")?.value; if (j) sc.jurisdiction = j;
+    const a = $("#scope-area")?.value; if (a) sc.taxonomy_area = a;
+    const o = $("#scope-origin")?.value; if (o) sc.origin = o;
+    const t = $("#scope-status")?.value; if (t) sc.temporal_status = t;
+    const i = $("#scope-inst")?.value; if (i) sc.instrument = i;
+    const b = $("#scope-body")?.value.trim(); if (b) sc.issuing_body = b;
+    return Object.keys(sc).length ? sc : null;
+  }
+
+  function updateScopeHint() {
+    const sc = currentScope();
+    const hint = $("#scope-hint");
+    if (!hint) return;
+    if (!sc) { hint.classList.add("hidden"); hint.textContent = ""; return; }
+    const labels = { jurisdiction: "jurisdiction", taxonomy_area: "legal area", origin: "origin", temporal_status: "status", instrument: "instrument", issuing_body: "issuing body" };
+    hint.textContent = "🎯 Scoping active — answers limited to: " + Object.entries(sc).map(([k, v]) => `${labels[k]}=${v}`).join(", ");
+    hint.classList.remove("hidden");
   }
 
   function srcCard(s) {
