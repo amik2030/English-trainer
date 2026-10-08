@@ -137,8 +137,8 @@ async def me(request: Request):
 
 # ---------------- ASK (RAG over approved knowledge) ----------------
 
-ASK_SYSTEM = """You are the AI research assistant of a private Legal Research Workbench used by data-protection lawyers.
-You answer questions about data protection, privacy, AI governance and compliance (GDPR, AI Act, FADP, Digital Omnibus, ePrivacy, Schrems II, transfers, breaches, etc.).
+ASK_SYSTEM = """You are the AI research assistant of a private Legal Research Workbench used by data-protection and employment lawyers.
+You answer questions about data protection, privacy, AI governance, employment law and compliance (GDPR, AI Act, FADP, Digital Omnibus, ePrivacy, Schrems II, transfers, breaches, employment contracts, working time, dismissal, employee monitoring, collective bargaining, occupational health & safety, cross-border posting, etc.).
 
 You receive: (1) the QUESTION, (2) APPROVED KNOWLEDGE ITEMS (curated by the human reviewer), (3) APPROVED SOURCES register, (4) PREVIOUS ANSWERED Q&A.
 
@@ -158,7 +158,7 @@ Respond with ONLY a JSON object:
 class AskScope(BaseModel):
     """Optional narrowing filters for an Ask query."""
     jurisdiction: Optional[str] = None        # EU | UK | CH | ... (exact match on source.jurisdiction)
-    taxonomy_area: Optional[str] = None       # top-level (A/B/C) or dotted prefix (A.1) matched against taxonomy_ids
+    taxonomy_area: Optional[str] = None       # top-level (A/B/C/D) or dotted prefix (A.1, D.4) matched against taxonomy_ids
     origin: Optional[str] = None              # external | internal (classification.origin; default external)
     temporal_status: Optional[str] = None     # IN_FORCE | DRAFT | PROPOSED | REPEALED | SUPERSEDED
     instrument: Optional[str] = None          # REGULATION | GUIDELINES | JUDGMENT | ...
@@ -345,7 +345,7 @@ async def kb(request: Request):
 
 # ---------------- Sources: propose + list ----------------
 
-SOURCE_CLASSIFY_SYSTEM = """You are the classification engine of a Legal Research Workbench for a data-protection practice.
+SOURCE_CLASSIFY_SYSTEM = """You are the classification engine of a Legal Research Workbench covering data protection, privacy, AI & digital regulation, information governance and employment law.
 Classify the external regulatory source per DDP Taxonomy v0.2. Respond with ONLY JSON:
 {
   "taxonomy_ids": ["A.1.1"], "tags": ["data-transfer"],
@@ -427,7 +427,7 @@ async def taxonomy(request: Request):
 
 # ---------------- REVIEWER: private review area ----------------
 
-EXTRACT_SYSTEM = """You are the knowledge-extraction engine of a Legal Research Workbench for data-protection lawyers.
+EXTRACT_SYSTEM = """You are the knowledge-extraction engine of a Legal Research Workbench for data-protection and employment lawyers.
 From the given source content, extract the most legally significant, durable knowledge items (rules, obligations, deadlines, thresholds, holdings).
 Respond with ONLY JSON: {"items": [{"content": "self-contained statement, 1-4 sentences, cites articles where possible", "taxonomy_ids": ["A.1.4"], "tags": ["data-transfer"], "rationale": "why this matters"}]}
 Rules: 3-8 items; each self-contained (understandable without the source); dotted IDs from the provided taxonomy; tags from the controlled vocabulary only; skip boilerplate."""

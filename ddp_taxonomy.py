@@ -66,6 +66,15 @@ TAXONOMY_NODES = {
     "C.3": "eDiscovery & legal hold",
     "C.4": "Archives & long-term preservation",
     "C.5": "Data quality & lifecycle",
+    # D — Employment Law (added 2026-10-08 per Amik request)
+    "D": "Employment Law",
+    "D.1": "Employment contracts & terms",
+    "D.2": "Working time & leave",
+    "D.3": "Termination & dismissal",
+    "D.4": "Employment data protection & monitoring (GDPR Art. 88, ArGV 3)",
+    "D.5": "Collective bargaining & worker representation",
+    "D.6": "Occupational health & safety",
+    "D.7": "Posting of workers & cross-border employment",
     # Z — catch-all
     "Z": "Unclassified / Misc",
 }

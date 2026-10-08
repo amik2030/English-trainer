@@ -188,6 +188,8 @@
     ["B.2", "B.2 · DSA"],
     ["B.5", "B.5 · NIS2 & Cyber"],
     ["C", "C · Information Governance"],
+    ["D", "D · Employment Law"],
+    ["D.4", "D.4 · Employment data & monitoring"],
   ];
 
   function fillScopeSelects() {
@@ -225,7 +227,7 @@
   }
 
   const JUR_FLAGS = { EU: "🇪🇺", UK: "🇬🇧", CH: "🇨🇭", INTL: "🌐", DE: "🇩🇪", FR: "🇫🇷", IT: "🇮🇹", AT: "🇦🇹", ES: "🇪🇸", NL: "🇳🇱", BE: "🇧🇪", US: "🇺🇸" };
-  const AREA_LABELS = { A: "Data Protection", B: "AI & Digital", C: "Info Governance", Z: "Unclassified" };
+  const AREA_LABELS = { A: "Data Protection", B: "AI & Digital", C: "Info Governance", D: "Employment", Z: "Unclassified" };
 
   function srcCard(s) {
     const st = { proposed: "amber", approved: "green", rejected: "red" }[s.status] || "";
@@ -427,7 +429,7 @@
   function kbRenderTree(activeId) {
     const tree = $("#kb-tree");
     if (!TAX) { tree.innerHTML = ""; return; }
-    const tops = ["A", "B", "C", "Z"].filter((t) => TAX.nodes[t]);
+    const tops = ["A", "B", "C", "D", "Z"].filter((t) => TAX.nodes[t]);
     // Helper: node path parts for a dotted id (A.3.4 → [A, A.3, A.3.4])
     const anc = (id) => {
       const parts = id.split("."), out = [];
