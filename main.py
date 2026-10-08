@@ -481,10 +481,15 @@ async def review_extract(request: Request):
     except Exception as e:
         raise HTTPException(502, f"extraction failed: {e}")
     created = []
+    # Idempotency: skip items whose normalized content already exists for this source (double-click/retry protection)
+    existing = admin.table("knowledge_items").select("content").eq("source_id", sid).execute().data or []
+    norm = lambda s: " ".join(str(s).lower().split())[:2000]
+    seen = {norm(e["content"]) for e in existing}
     for it in (out.get("items") or [])[:10]:
         c = str(it.get("content", "")).strip()
-        if len(c) < 30:
+        if len(c) < 30 or norm(c) in seen:
             continue
+        seen.add(norm(c))
         ids = [str(i).strip() for i in it.get("taxonomy_ids", []) if str(i).strip() in TAXONOMY_NODES][:3] or ["Z"]
         tags = [str(t).strip().lstrip("#") for t in it.get("tags", []) if str(t).strip().lstrip("#") in TAXONOMY_TAGS][:5]
         ins = admin.table("knowledge_items").insert({
@@ -517,6 +522,12 @@ async def review_action(req: ReviewAction, request: Request):
     if not row:
         raise HTTPException(404, "not found")
     before = row[0]
+    target_status = {"approve": "approved", "reject": "rejected", "revise": "approved"}[req.action] \
+        if table in ("sources", "knowledge_items") else \
+        {"approve": "curated", "reject": "dismissed", "revise": "curated"}[req.action]
+    # Idempotency: already in target state and no content changes -> no-op, no duplicate review_log
+    if before.get("status") == target_status and not (req.notes or req.updated_content or req.updated_title):
+        return {"ok": True, "entity": before, "noop": True}
     updates = {"reviewer_notes": (req.notes or "")[:1000] or None}
     if table in ("sources", "knowledge_items"):
         updates["reviewed_at"] = _now()

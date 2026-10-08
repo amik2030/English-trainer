@@ -158,6 +158,23 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
   transition: filter .15s;
 }
 .btn:hover { filter: brightness(1.12); }
+.btn:disabled, .btn[aria-busy="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+  pointer-events: none;
+}
+.btn[data-busy="true"]::after {
+  content: "…";
+  display: inline-block;
+  margin-left: 6px;
+  animation: btn-busy 1s infinite steps(3, end);
+}
+@keyframes btn-busy {
+  0% { content: "…"; }
+  33% { content: "……"; }
+  66% { content: "………"; }
+}
 .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
 .btn.ghost:hover { color: var(--text); border-color: var(--blue); }
 .btn.sm { padding: 8px 14px; font-size: 12.5px; border-radius: 8px; }

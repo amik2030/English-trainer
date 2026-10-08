@@ -638,8 +638,16 @@
 
   function wireReviewButtons() {
     $$("#review button[data-act]").forEach((b) => b.addEventListener("click", async () => {
+      if (b.dataset.busy === "true") return; // hard guard against double-click
       const act = b.dataset.act;
-      b.disabled = true;
+      // freeze the whole action row: no second action while one is in flight
+      const row = b.closest(".row-actions") || b.parentElement;
+      const siblings = $$("button[data-act]", row);
+      const prevLabel = b.textContent;
+      siblings.forEach((s) => { s.disabled = true; s.dataset.prevLabel = s.textContent; });
+      b.dataset.busy = "true";
+      if (act === "extract") b.textContent = "Extracting…";
+      else b.textContent = "Working…";
       try {
         if (act === "extract") {
           toast("🧠 Extracting knowledge from source… this can take a moment");
@@ -662,7 +670,13 @@
         }
         await loadQueue();
         loadKB(); loadSources();
-      } catch (e) { toast("❌ " + e.message); b.disabled = false; }
+      } catch (e) {
+        toast("❌ " + e.message);
+        // restore buttons only on failure
+        siblings.forEach((s) => { s.disabled = false; if (s.dataset.prevLabel) s.textContent = s.dataset.prevLabel; });
+        delete b.dataset.busy;
+        b.textContent = prevLabel;
+      }
     }));
     // toggle note boxes on "revise"
     $$('#review button[data-act="revise"]').forEach((b) => b.addEventListener("click", (e) => {
