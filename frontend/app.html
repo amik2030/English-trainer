@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pocket DDP Workbench</title>
 <meta http-equiv="Cache-Control" content="no-store">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
@@ -132,6 +132,7 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
       <a href="#ask" class="nav-link active" data-screen="ask"><span class="nav-icon">⚡</span> Ask</a>
       <a href="#kb" class="nav-link" data-screen="kb"><span class="nav-icon">🧱</span> Knowledge Base</a>
       <a href="#sources" class="nav-link" data-screen="sources"><span class="nav-icon">📚</span> Sources</a>
+      <a href="#auditor" class="nav-link" data-screen="auditor"><span class="nav-icon">🔎</span> Notice Auditor</a>
       <a href="#review" class="nav-link hidden" data-screen="review" id="nav-review"><span class="nav-icon">🛡</span> Review <span class="nav-tag" id="review-count"></span></a>
     </nav>
     <div class="sidebar-footer">
@@ -254,6 +255,32 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
     </section>
 
     <!-- REVIEW (reviewer only) -->
+    <!-- PRIVACY NOTICE AUDITOR -->
+    <section id="auditor" class="screen">
+      <div class="eyebrow">Compliance tooling</div>
+      <h1>Privacy Notice Auditor</h1>
+      <p class="lede">Point it at a site or a notice URL. It fetches the notice, runs the GDPR Art. 13 / ePrivacy Art. 5(3) transparency checklist, then adds a qualitative review of what pattern matching can't see.</p>
+
+      <div class="card aud-form">
+        <div class="aud-row">
+          <input id="aud-url" placeholder="https://company.com  or  https://company.com/privacy" maxlength="500">
+          <button class="btn primary" id="aud-btn">Audit</button>
+        </div>
+        <div class="aud-row" style="margin-top:10px">
+          <input id="aud-label" placeholder="Label (optional) — e.g. 'Acme · client onboarding'" maxlength="200">
+          <label class="aud-check"><input type="checkbox" id="aud-deep" checked> Qualitative AI review</label>
+        </div>
+      </div>
+
+      <div id="aud-loading" class="hidden card" style="text-align:center;margin-top:14px">
+        <span class="spin"></span> <span class="muted small">Fetching the notice and running 22 checks…</span>
+      </div>
+      <div id="aud-result"></div>
+
+      <div class="section-head"><h2>🗂 Past audits</h2></div>
+      <div id="aud-history"><span class="spin"></span></div>
+    </section>
+
     <section id="review" class="screen">
       <div class="eyebrow">Human in the loop</div>
       <h1>Review Queue</h1>
@@ -281,6 +308,6 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
   </main>
 </div>
 
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

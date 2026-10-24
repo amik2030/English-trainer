@@ -597,6 +597,85 @@ async def set_role(request: Request):
 
 # ---------------- static frontend (mount last) ----------------
 
+# ---------------- PRIVACY NOTICE AUDITOR ----------------
+from notice_auditor import audit as audit_notice, ALL_CHECKS
+
+
+class AuditRequest(BaseModel):
+    url: str
+    label: Optional[str] = None
+    deep: bool = True  # qualitative LLM pass on top of the deterministic checklist
+
+
+@app.get("/api/auditor/checks")
+async def auditor_checks(request: Request):
+    await current_user(request)
+    return {"checks": [{"id": c.id, "domain": c.domain, "ref": c.ref, "title": c.title}
+                       for c in ALL_CHECKS]}
+
+
+@app.post("/api/auditor/scan")
+async def auditor_scan(req: AuditRequest, request: Request):
+    prof = await current_user(request)
+    url = (req.url or "").strip()
+    if not url:
+        raise HTTPException(400, "url required")
+    if not url.lower().startswith(("http://", "https://")):
+        url = "https://" + url.lstrip("/")
+    try:
+        result = await audit_notice(url, llm_json=_llm_json if req.deep else None)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"audit failed: {e}")
+
+    result["fetched_at"] = _now()
+    result["label"] = (req.label or "").strip()[:200] or None
+    ins = admin.table("notice_scans").insert({
+        "user_id": prof["id"],
+        "label": result["label"],
+        "site_url": url,
+        "notice_url": result.get("notice_url"),
+        "status": "done",
+        "scores": result.get("scores") or {},
+        "result": result,
+    }).execute()
+    return {"id": (ins.data or [{}])[0].get("id"), **result}
+
+
+@app.get("/api/auditor/scans")
+async def auditor_scans(request: Request, limit: int = 30):
+    prof = await current_user(request)
+    q = admin.table("notice_scans").select("id, label, site_url, notice_url, status, scores, created_at")
+    if prof.get("role") != "reviewer":
+        q = q.eq("user_id", prof["id"])
+    rows = q.order("created_at", desc=True).limit(min(limit, 100)).execute().data or []
+    return {"count": len(rows), "scans": rows}
+
+
+@app.get("/api/auditor/scans/{scan_id}")
+async def auditor_scan_get(scan_id: int, request: Request):
+    prof = await current_user(request)
+    rows = admin.table("notice_scans").select("*").eq("id", scan_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "scan not found")
+    if rows[0]["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your scan")
+    return rows[0]
+
+
+@app.delete("/api/auditor/scans/{scan_id}")
+async def auditor_scan_delete(scan_id: int, request: Request):
+    prof = await current_user(request)
+    rows = admin.table("notice_scans").select("id, user_id").eq("id", scan_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "scan not found")
+    if rows[0]["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your scan")
+    admin.table("notice_scans").delete().eq("id", scan_id).execute()
+    return {"ok": True}
+
+
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 if not FRONTEND_DIR.exists():
     FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"

@@ -104,6 +104,7 @@
       $$(".screen").forEach((s) => s.classList.toggle("visible", s.id === id));
       if (id === "kb") loadKB();
       if (id === "review") loadQueue();
+      if (id === "auditor") loadAudits();
     }));
     $$(".tab").forEach((t) => t.addEventListener("click", () => {
       $$(".tab").forEach((x) => x.classList.remove("active"));
@@ -728,6 +729,171 @@
       loadKB();
     } catch (e) { toast("❌ " + e.message); }
   });
+
+  // ---------- PRIVACY NOTICE AUDITOR ----------
+  const gradeClass = (g) => "g-" + (["A", "B", "C", "D", "F"].includes(g) ? g : "F");
+  const pctColor = (p) => (p >= 90 ? "#3fb950" : p >= 75 ? "var(--blue)" : p >= 60 ? "#d29922" : "#f85149");
+
+  function domainBar(name, d) {
+    const color = pctColor(d.pct);
+    return `<div style="flex:1;min-width:160px">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px">
+        <span>${esc(name)}${d.advisory ? ' <span class="badge" style="font-size:9.5px">advisory</span>' : ""}</span>
+        <span class="muted">${d.passed}/${d.total} · ${d.pct}% <b style="color:${color}">${esc(d.grade)}</b></span>
+      </div>
+      <div class="scorebar"><i style="width:${d.pct}%;background:${color}"></i></div>
+    </div>`;
+  }
+
+  function checkRow(c) {
+    const failed = !c.passed;
+    return `<div class="chk">
+      <div class="mk">${failed ? "❌" : "✅"}</div>
+      <div style="flex:1">
+        <div style="${failed ? "" : "color:var(--muted)"}">${esc(c.title)}</div>
+        <span class="ref">${esc(c.ref)}${failed ? "" : " · " + esc(c.detail || "")}</span>
+        ${failed && c.evidence ? `<div class="ev">…${esc(c.evidence)}…</div>` : ""}
+      </div>
+    </div>`;
+  }
+
+  function auditCard(r, id) {
+    const s = r.scores || {};
+    const dom = s.domains || {};
+    const llm = r.llm;
+    const checks = r.checks || [];
+    const fails = checks.filter((c) => !c.passed);
+    const passes = checks.filter((c) => c.passed);
+    const order = ["GDPR", "ePrivacy", "Swiss FADP"];
+
+    const warnHtml = (r.warnings || []).map((w) => `<div class="aud-warn">⚠︎ ${esc(w)}</div>`).join("");
+
+    const llmHtml = llm
+      ? `<div class="card" style="margin-top:14px;background:var(--bg2)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <h3 style="margin:0">🧠 Qualitative review</h3>
+            <div>
+              <span class="badge blue">${esc(llm.jurisdiction_guess || "?")}</span>
+              <span class="badge">plain language ${esc(llm.plain_language_score ?? "?")}/10</span>
+            </div>
+          </div>
+          ${llm.summary ? `<p class="small" style="margin-bottom:12px">${esc(llm.summary)}</p>` : ""}
+          ${(llm.findings || []).map((f) => `<div class="aud-finding">
+              <div><span class="pill ${esc(f.severity || "low")}">${esc(f.severity || "low")}</span>
+              <b style="margin-left:6px">${esc(f.issue || "")}</b></div>
+              ${f.ref ? `<div class="ref" style="font-size:11.5px;color:var(--muted)">${esc(f.ref)}</div>` : ""}
+              ${f.quote ? `<div class="q">“${esc(f.quote)}”</div>` : ""}
+              ${f.fix ? `<div class="small"><b style="color:#3fb950">Fix:</b> ${esc(f.fix)}</div>` : ""}
+            </div>`).join("")}
+          ${(llm.positive || []).length ? `<div class="small" style="margin-top:6px"><b class="muted">Done well:</b> ${llm.positive.map((p) => esc(p)).join(" · ")}</div>` : ""}
+        </div>`
+      : "";
+
+    return `<div class="card" style="margin-top:16px"${id ? ` id="audit-${id}"` : ""}>
+      <div class="grade-card">
+        <div class="grade-badge ${gradeClass(s.overall_grade)}">
+          <span class="g">${esc(s.overall_grade || "?")}</span>
+          <span class="p">${esc(s.overall_pct ?? 0)}%</span>
+        </div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-weight:700;font-size:15px">${esc(r.label || r.notice_url || r.requested_url || "Audit")}</div>
+          <div class="muted small" style="word-break:break-all">${esc(r.notice_url || "")}</div>
+          <div class="muted small" style="margin-top:4px">${esc(s.passed_count ?? 0)}/${esc(s.total_count ?? 0)} checks passed · ${esc(r.char_count || 0)} chars${r.truncated ? " (truncated)" : ""}${r.is_hub ? ' · <b style="color:#d29922">index page, not full notice</b>' : ""}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 4px">
+        ${order.filter((k) => dom[k]).map((k) => domainBar(k, dom[k])).join("")}
+      </div>
+      ${warnHtml}
+      <h3 style="margin:18px 0 6px;font-size:14px">❌ Gaps (${fails.length})</h3>
+      ${fails.length ? fails.map(checkRow).join("") : '<p class="muted small">No checklist failures. 🎉</p>'}
+      ${llmHtml}
+      ${passes.length ? `<details style="margin-top:12px"><summary class="muted small" style="cursor:pointer">Show ${passes.length} passed checks</summary><div style="margin-top:8px">${passes.map(checkRow).join("")}</div></details>` : ""}
+      <div class="row-actions" style="margin-top:14px">
+        ${r.notice_url ? `<a class="btn small" href="${esc(r.notice_url)}" target="_blank" rel="noopener">Open notice ↗</a>` : ""}
+        ${id ? `<button class="btn small red" data-aud-del="${id}">Delete</button>` : ""}
+      </div>
+    </div>`;
+  }
+
+  async function runAudit() {
+    const url = $("#aud-url").value.trim();
+    if (!url) return toast("Enter a URL");
+    const btn = $("#aud-btn");
+    btn.disabled = true; btn.textContent = "Auditing…";
+    $("#aud-result").innerHTML = "";
+    $("#aud-loading").classList.remove("hidden");
+    try {
+      const r = await api("/api/auditor/scan", { method: "POST", body: {
+        url, label: $("#aud-label").value.trim() || null, deep: $("#aud-deep").checked,
+      } });
+      $("#aud-result").innerHTML = auditCard(r, r.id);
+      wireAuditDelete();
+      loadAudits();
+    } catch (e) {
+      $("#aud-result").innerHTML = `<div class="card" style="color:#f85149;margin-top:14px">❌ ${esc(e.message)}</div>`;
+    }
+    $("#aud-loading").classList.add("hidden");
+    btn.disabled = false; btn.textContent = "Audit";
+  }
+
+  function wireAuditDelete() {
+    $$("button[data-aud-del]").forEach((b) => {
+      if (b.dataset.bound) return;
+      b.dataset.bound = "1";
+      b.addEventListener("click", async () => {
+        if (!confirm("Delete this audit?")) return;
+        b.disabled = true;
+        try {
+          await api("/api/auditor/scans/" + b.dataset.audDel, { method: "DELETE" });
+          toast("🗑 Deleted");
+          const card = document.getElementById("audit-" + b.dataset.audDel);
+          if (card) card.remove();
+          loadAudits();
+        } catch (e) { toast("❌ " + e.message); b.disabled = false; }
+      });
+    });
+  }
+
+  async function loadAudits() {
+    const el = $("#aud-history");
+    if (!el) return;
+    try {
+      const r = await api("/api/auditor/scans?limit=25");
+      if (!r.scans.length) { el.innerHTML = '<p class="muted small">No audits yet.</p>'; return; }
+      el.innerHTML = r.scans.map((s) => {
+        const g = s.scores?.overall_grade || "?";
+        return `<div class="card" style="margin-bottom:9px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="grade-badge ${gradeClass(g)}" style="width:46px;height:46px;border-radius:12px">
+            <span class="g" style="font-size:19px">${esc(g)}</span>
+          </div>
+          <div style="flex:1;min-width:180px">
+            <div style="font-weight:600;font-size:13.5px">${esc(s.label || s.site_url)}</div>
+            <div class="muted" style="font-size:11.5px;word-break:break-all">${esc(s.notice_url || s.site_url)}</div>
+            <div class="muted" style="font-size:11px">${new Date(s.created_at).toLocaleString()} · ${esc(s.scores?.overall_pct ?? 0)}%</div>
+          </div>
+          <div class="row-actions" style="margin:0">
+            <button class="btn small" data-aud-open="${s.id}">View</button>
+            <button class="btn small red" data-aud-del="${s.id}">🗑</button>
+          </div>
+        </div>`;
+      }).join("");
+      $$('#aud-history button[data-aud-open]').forEach((b) => b.addEventListener("click", async () => {
+        b.disabled = true;
+        try {
+          const row = await api("/api/auditor/scans/" + b.dataset.audOpen);
+          $("#aud-result").innerHTML = auditCard({ ...(row.result || {}), label: row.label }, row.id);
+          wireAuditDelete();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (e) { toast("❌ " + e.message); }
+        b.disabled = false;
+      }));
+      wireAuditDelete();
+    } catch (e) { el.innerHTML = `<p class="muted small">${esc(e.message)}</p>`; }
+  }
+
+  $("#aud-btn")?.addEventListener("click", runAudit);
+  $("#aud-url")?.addEventListener("keydown", (e) => { if (e.key === "Enter") runAudit(); });
 
   boot().catch((e) => { console.error(e); showLogin(); });
 })();
