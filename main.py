@@ -595,8 +595,6 @@ async def set_role(request: Request):
     return {"ok": True, "profile": admin.table("profiles").select("*").eq("id", prof[0]["id"]).execute().data[0]}
 
 
-# ---------------- static frontend (mount last) ----------------
-
 # ---------------- PRIVACY NOTICE AUDITOR ----------------
 from notice_auditor import audit as audit_notice, ALL_CHECKS
 
@@ -675,6 +673,8 @@ async def auditor_scan_delete(scan_id: int, request: Request):
     admin.table("notice_scans").delete().eq("id", scan_id).execute()
     return {"ok": True}
 
+
+# ---------------- static frontend (mount last) ----------------
 
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 if not FRONTEND_DIR.exists():
