@@ -89,6 +89,7 @@ TAXONOMY_TAGS = [
     "remote-biometric", "cookie-consent", "direct-marketing", "whistleblowing",
     "internal-investigation", "pharma-research", "clinical-trials", "RWD",
     "pharmacovigilance", "cybersecurity", "incident-response",
+    "case-law",
 ]
 
 # Orthogonal axes

@@ -268,6 +268,7 @@
       status: $("#srcf-status")?.value || "",
       origin: $("#srcf-origin")?.value || "",
       tstatus: $("#srcf-tstatus")?.value || "",
+      caselaw: $("#srcf-caselaw")?.classList.contains("primary") || false,
     };
   }
 
@@ -282,6 +283,7 @@
     if (f.status && s.status !== f.status) return false;
     if (f.origin && String(((s.classification || {}).origin) || "external") !== f.origin) return false;
     if (f.tstatus && String(((s.classification || {}).temporal_status) || "IN_FORCE") !== f.tstatus) return false;
+    if (f.caselaw && !["JUDGMENT", "DPA_DECISION"].includes((s.instrument || "").toUpperCase())) return false;
     return true;
   }
 
@@ -335,8 +337,14 @@
   function wireSourceFilters() {
     ["#srcf-search", "#srcf-jur", "#srcf-area", "#srcf-inst", "#srcf-status", "#srcf-origin", "#srcf-tstatus"].forEach((sel) =>
       $(sel)?.addEventListener("input", renderSourceList));
+    $("#srcf-caselaw")?.addEventListener("click", () => {
+      const btn = $("#srcf-caselaw");
+      btn.classList.toggle("primary");
+      renderSourceList();
+    });
     $("#srcf-clear")?.addEventListener("click", () => {
       ["#srcf-search", "#srcf-jur", "#srcf-area", "#srcf-inst", "#srcf-status", "#srcf-origin", "#srcf-tstatus"].forEach((sel) => { $(sel).value = ""; });
+      $("#srcf-caselaw")?.classList.remove("primary");
       renderSourceList();
     });
   }
@@ -376,13 +384,14 @@
   });
 
   // ---------- KB — KNOWLEDGE NAVIGATOR ----------
-  const KB = { items: [], sources: [], node: null, search: "", jur: "" };
+  const KB = { items: [], sources: [], node: null, search: "", jur: "", caselaw: false };
 
   function countUnder(prefix) {
     // direct = tagged with exactly this node; total = tagged with this node or any descendant
     let direct = 0, total = 0, srcTot = 0;
     const pfx = prefix + ".";
-    for (const it of KB.items) {
+    const pool = KB.caselaw ? KB.items.filter(isCaseLaw) : KB.items;
+    for (const it of pool) {
       const ids = it.taxonomy_ids || [];
       if (ids.some((i) => i === prefix)) direct++;
       if (ids.some((i) => i === prefix || String(i).startsWith(pfx))) total++;
@@ -480,6 +489,13 @@
       || ((it.taxonomy_ids || []).some((t) => (TAX?.nodes?.[t] || t).toLowerCase().includes(q))));
   }
 
+  const CASE_LAW_INSTR = ["JUDGMENT", "DPA_DECISION"];
+  function isCaseLaw(it) {
+    if ((it.tags || []).some((t) => String(t).toLowerCase() === "case-law")) return true;
+    const inst = (it.sources?.instrument || "").toUpperCase();
+    return CASE_LAW_INSTR.includes(inst);
+  }
+
   function kbItemsFor(nodeId) {
     const pfx = nodeId + ".";
     let items = KB.items.filter((it) => (it.taxonomy_ids || []).some((i) => i === nodeId || String(i).startsWith(pfx)));
@@ -518,7 +534,16 @@
       items = KB.items.slice();
       if (KB.jur) items = items.filter((it) => (it.sources?.jurisdiction || it.source_jur || "") === KB.jur);
     }
+    if (KB.caselaw) items = items.filter(isCaseLaw);
     if (KB.node && !KB.search && !items.length) {
+      if (KB.caselaw) {
+        el.innerHTML = `<div class="card" style="border-left:4px solid var(--amber,#d29922)">
+          <h3 style="margin:0 0 6px">${esc(TAX?.nodes?.[KB.node] || KB.node)}</h3>
+          <p class="muted">No case law in this area yet.</p>
+          <p class="muted small">Turn off ⚖️ Case law only to see the other notes, or add a judgment source and extract it.</p>
+        </div>`;
+        return;
+      }
       el.innerHTML = `<div class="card" style="border-left:4px solid var(--amber,#d29922)">
         <h3 style="margin:0 0 6px">${esc(TAX?.nodes?.[KB.node] || KB.node)}</h3>
         <p class="muted">No knowledge notes in this area yet.</p>
@@ -528,7 +553,8 @@
       </div>`;
       return;
     }
-    const label = KB.node ? (TAX?.nodes?.[KB.node] || KB.node) : (KB.search ? `search: “${esc(KB.search)}”` : "All knowledge");
+    let label = KB.node ? (TAX?.nodes?.[KB.node] || KB.node) : (KB.search ? `search: “${esc(KB.search)}”` : "All knowledge");
+    if (KB.caselaw) label = "⚖️ Case law · " + label;
     const srcs = new Set(items.map((it) => it.sources?.title).filter(Boolean));
     const head = `<div class="kb-ann-head">
       <h2 style="margin:0">${label}</h2>
@@ -572,6 +598,11 @@
         KB._wiredSearch = true;
         $("#kb-search").addEventListener("input", () => { KB.search = $("#kb-search").value.trim(); kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); });
         $("#kb-jur").addEventListener("change", () => { KB.jur = $("#kb-jur").value; kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); });
+        $("#kb-caselaw")?.addEventListener("click", () => {
+          KB.caselaw = !KB.caselaw;
+          $("#kb-caselaw").classList.toggle("primary", KB.caselaw);
+          kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent();
+        });
       }
       if (!KB.node && !KB.search) { kbRenderTree(""); kbRenderContent(); }
       else { kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); }

@@ -178,6 +178,11 @@ h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
 .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
 .btn.ghost:hover { color: var(--text); border-color: var(--blue); }
 .btn.sm { padding: 8px 14px; font-size: 12.5px; border-radius: 8px; }
+.btn.tiny { padding: 7px 12px; font-size: 12px; border-radius: 8px; font-weight: 600;
+  background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.btn.tiny:hover { color: var(--text); border-color: var(--blue); filter: none; }
+.btn.tiny.primary { background: linear-gradient(120deg, var(--blue), var(--purple)); color: #fff; border-color: transparent; }
+.btn.tiny.primary:hover { filter: brightness(1.12); }
 .btn.green { background: var(--green); color: #06281c; }
 .btn.amber { background: transparent; border: 1px solid var(--amber); color: var(--amber); }
 

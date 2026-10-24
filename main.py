@@ -333,8 +333,8 @@ async def history(request: Request, limit: int = 20):
 @app.get("/api/kb")
 async def kb(request: Request):
     prof = await current_user(request)
-    items = admin.table("knowledge_items").select("*, sources(title, url, jurisdiction)") \
-        .eq("status", "approved").order("reviewed_at", desc=True).limit(200).execute().data or []
+    items = admin.table("knowledge_items").select("*, sources(title, url, jurisdiction, instrument)") \
+        .eq("status", "approved").order("reviewed_at", desc=True).limit(400).execute().data or []
     srcs = admin.table("sources").select("id, title, url, instrument, jurisdiction, taxonomy_ids, tags, reviewed_at") \
         .eq("status", "approved").order("reviewed_at", desc=True).limit(100).execute().data or []
     for it in items:
