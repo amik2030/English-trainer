@@ -798,7 +798,7 @@
         <div style="flex:1;min-width:220px">
           <div style="font-weight:700;font-size:15px">${esc(r.label || r.notice_url || r.requested_url || "Audit")}</div>
           <div class="muted small" style="word-break:break-all">${esc(r.notice_url || "")}</div>
-          <div class="muted small" style="margin-top:4px">${esc(s.passed_count ?? 0)}/${esc(s.total_count ?? 0)} checks passed · ${esc(r.char_count || 0)} chars${r.truncated ? " (truncated)" : ""}${r.is_hub ? ' · <b style="color:#d29922">index page, not full notice</b>' : ""}</div>
+          <div class="muted small" style="margin-top:4px">${esc(s.passed_count ?? 0)}/${esc(s.total_count ?? 0)} checks passed · ${esc((r.char_count || 0).toLocaleString())} chars analysed in full${r.llm_input_truncated ? ' · <b style="color:#d29922">AI review saw head+tail only</b>' : ""}${r.is_hub ? ' · <b style="color:#d29922">index page, not full notice</b>' : ""}</div>
         </div>
       </div>
       <div style="display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 4px">

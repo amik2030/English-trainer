@@ -45,7 +45,14 @@ def html_to_text(html: str) -> str:
     for k, v in entities.items():
         html = html.replace(k, v)
     html = re.sub(r"&#(\d+);", lambda m: chr(int(m.group(1))) if int(m.group(1)) < 0x10000 else " ", html)
-    return re.sub(r"[ \t\r\f\v]+", " ", re.sub(r"\n{3,}", "\n\n", html)).strip()
+    # Collapse ALL whitespace runs (including newlines) to a single space. Sites that wrap
+    # every word in a <span> otherwise produce "data\nprotection\nofficer", which silently
+    # breaks every multi-word compliance pattern.
+    text = re.sub(r"[\s\u00a0]+", " ", html).strip()
+    # Re-introduce paragraph breaks only where sentence punctuation ends, so evidence
+    # snippets stay readable without the newline noise coming back.
+    text = re.sub(r"(?<=[.!?])\s{2,}", "\n", text)
+    return text
 
 
 async def fetch(url: str, client: httpx.AsyncClient) -> tuple[str, str]:
@@ -130,15 +137,20 @@ def _hit(text: str, patterns: list[str]) -> tuple[bool, int, str]:
 GDPR_CHECKS = [
     Check("controller", "GDPR", "Art. 13(1)(a)", "Identity of the controller disclosed",
           patterns=[r"\b(?:data\s+)?controller\b", r"\bwe\s+(?:are|act\s+as)\s+(?:the\s+)?(?:data\s+)?controller\b",
-                    r"responsible\s+(?:party|body|entity|for\s+the\s+processing)"]),
+                    r"responsible\s+(?:party|body|entity)",
+                    r"\bresponsible\s+for\s+(?:the\s+)?(?:process\w*|your\s+(?:personal\s+)?data|personal\s+data)",
+                    r"\b(?:is|are)\s+responsible\s+for\s+process"]),
     Check("dpo", "GDPR", "Art. 13(1)(b)", "DPO / privacy contact provided",
           patterns=[r"data\s+protection\s+officer", r"\bDPO\b", r"privacy\s+(?:officer|team|office|contact|desk|mailbox)",
                     r"data\s+protection\s+(?:advisor|contact|representative|authority\s+contact)",
                     r"[\w.+-]*privacy[\w.+-]*@[\w.-]+\.[a-z]{2,}"]),
     Check("contact", "GDPR", "Art. 13(1)(a)", "Controller contact details provided",
           patterns=[r"(?:e-?mail|mail)\s*[:\-]?\s*[\w.+-]+@[\w.-]+\.[a-z]{2,}",
+                    r"[\w.+-]+@[\w.-]+\.[a-z]{2,}",
                     r"(?:phone|tel|telephone)\s*[:\-]?\s*\+?[\d\s()\-]{7,}",
-                    r"(?:registered\s+)?(?:address|seat|office)\s*[:\-]"]),
+                    r"(?:registered\s+)?(?:address|seat|office)\s*[:\-]",
+                    r"\bby\s+post\b", r"\bin\s+writing\s+to\b",
+                    r"\b\d{4,5}\s+[A-ZÄÖÜ][\wäöüß.\-]+"]),
     Check("purposes", "GDPR", "Art. 13(1)(c)", "Purposes of processing stated",
           patterns=[r"purpose[s]?\s+(?:of|for)\s+(?:the\s+)?process", r"we\s+(?:collect|use|process|store)\s+.{0,60}(?:to|for|in\s+order)",
                     r"personal\s+data\s+(?:is|are|will\s+be|may\s+be)\s+(?:used|processed|collected)",
@@ -160,8 +172,11 @@ GDPR_CHECKS = [
                     r"(?:store|keep|retain|process).{0,60}for\s+(?:a\s+period|up\s+to|at\s+least|\d+\s+(?:year|month|day|week))",
                     r"storage\s+(?:period|duration|limit)", r"(?:deleted|erased|removed)\s+.{0,40}(?:after|when|once)"]),
     Check("rights", "GDPR", "Art. 13(2)(b)/15-22", "Data subject rights explained",
-          weight=2, min_hits=4,
+          weight=2, min_hits=3,
           patterns=[r"right\s+of\s+access", r"right\s+to\s+(?:rectification|correction|correct)",
+                    r"right\s+to\s+access", r"\baccess\s+to\b.{0,40}\byour\s+(?:personal\s+)?(?:data|information)",
+                    r"\bdeletion\s+of\b.{0,40}\byour\s+(?:personal\s+)?(?:data|information)",
+                    r"\b(?:rectification|correction)\b.{0,40}\byour\s+(?:personal\s+)?(?:data|information)",
                     r"right\s+to\s+erasure", r"right\s+to\s+be\s+forgotten", r"right\s+(?:of|to)\s+(?:restriction|limitation)",
                     r"right\s+to\s+data\s+portability", r"right\s+to\s+object", r"right\s+to\s+(?:withdraw|revoke)\s+(?:your\s+)?consent",
                     r"right\s+not\s+to\s+be\s+subject\s+to\s+(?:a\s+)?(?:decision\s+based\s+solely\s+on\s+)?automated",
@@ -169,6 +184,7 @@ GDPR_CHECKS = [
     Check("complain", "GDPR", "Art. 13(2)(d)", "Right to lodge a complaint with a supervisory authority",
           patterns=[r"supervisory\s+authorit", r"data\s+protection\s+authorit", r"competent\s+authorit",
                     r"(?:lodge|file)\s+a\s+complaint", r"right\s+to\s+complain", r"regulatory\s+authorit",
+                    r"information\s+commissioner", r"\bcommissioner\b",
                     r"\bFDPIC\b", r"\bEDPB\b"]),
     Check("obligation", "GDPR", "Art. 13(2)(e)", "Whether provision of data is required + consequences",
           patterns=[r"(?:statutory|legal|regulatory)\s+(?:requirement|obligation|duty)",
@@ -181,10 +197,14 @@ GDPR_CHECKS = [
                     r"(?:logic|significance|envisaged\s+consequences)\s+involved"]),
     Check("children", "GDPR", "Art. 8 / 13", "Children's data / age limits addressed",
           patterns=[r"child(?:ren)?(?:'s)?\s+(?:data|personal\s+data|privacy)", r"under\s+(?:the\s+age\s+of\s+)?(?:13|16|18)\s+years",
+                    r"\bchild(?:ren)?\b",
+                    r"\b(?:at\s+least|aged?|minimum\s+age\s+of)\s+(?:1[3-8])\b",
                     r"parental\s+(?:consent|responsibility)", r"age\s+(?:of\s+)?(?:consent|majority|limit)", r"\bminors?\b"]),
     Check("updates", "GDPR", "Art. 12(1)/13(3)", "Notice version / change-notification practice described",
           patterns=[r"(?:last|date\s+of)\s+(?:updated|modified|revised|reviewed)", r"we\s+(?:may|will)\s+(?:update|amend|change)\s+this\s+(?:privacy|notice|policy)",
-                    r"version\s+(?:number|\d)", r"effective\s+(?:date|as\s+of)"]),
+                    r"version\s+(?:number|\d)", r"effective\s+(?:date|as\s+of)",
+                    r"\bupdated\b.{0,60}\b(?:19|20)\d{2}\b", r"(?:19|20)\d{2}\b.{0,40}\bupdated\b",
+                    r"updated\s+to\s+reflect"]),
 ]
 
 EPRIVACY_CHECKS = [
@@ -204,7 +224,9 @@ EPRIVACY_CHECKS = [
                     r"browser\s+settings", r"unsubscribe"]),
     Check("emarketing", "ePrivacy", "Art. 6 / 13", "Electronic marketing communications addressed",
           patterns=[r"electronic\s+(?:communication|marketing)", r"(?:e-?mail|newsletter)\s+(?:marketing|communication)",
-                    r"direct\s+marketing", r"newsletter", r"push\s+notification", r"\bSMS\b", r"(?:soft|hard)\s+opt"]),
+                    r"direct\s+marketing", r"newsletter", r"push\s+notification", r"\bSMS\b", r"(?:soft|hard)\s+opt",
+                    r"\bfor\s+marketing\b", r"marketing\s+(?:activities|purposes|communications|materials?|messages?)",
+                    r"\bopt[- ]?out\b", r"\bunsubscrib"]),
 ]
 
 SWISS_CHECKS = [
@@ -293,13 +315,33 @@ Respond with ONLY JSON:
 {"jurisdiction_guess":"EU|CH|UK|US|INTL","plain_language_score":0-10,"summary":"2-3 sentences",
  "findings":[{"severity":"high|medium|low","ref":"Art. 13(1)(f)","issue":"what is wrong","quote":"short verbatim quote","fix":"how to fix it"}],
  "positive":["up to 3 things done well"]}
-Max 8 findings, ordered by severity. If the text was truncated, say so in the summary."""
+Max 8 findings, ordered by severity.
+The prompt tells you SEGMENT INFO: how much of the notice you are seeing. Only mention truncation in the
+summary if SEGMENT INFO explicitly says the text was truncated. If it says you are seeing the complete
+notice, do NOT describe the notice as truncated, partial, or cut off."""
+
+
+LLM_TEXT_LIMIT = 60000  # ~15k tokens; comfortable within gpt-4o-mini's 128k context
 
 
 def build_llm_prompt(notice_text: str, checklist: list[dict], site: str) -> str:
     compact = [{"ref": c["ref"], "check": c["title"], "passed": c["passed"]} for c in checklist]
+    total = len(notice_text)
+    if total <= LLM_TEXT_LIMIT:
+        segment = (f"SEGMENT INFO: the COMPLETE notice is included below ({total} characters). "
+                   f"Nothing was truncated.")
+        excerpt = notice_text
+    else:
+        head = int(LLM_TEXT_LIMIT * 0.6)
+        tail = LLM_TEXT_LIMIT - head
+        segment = (f"SEGMENT INFO: the notice is {total} characters. You are seeing the first {head} "
+                   f"characters and the final {tail} characters, with a gap in the middle. "
+                   f"This IS truncated — say so in the summary.")
+        excerpt = (notice_text[:head]
+                   + f"\n\n[... {total - LLM_TEXT_LIMIT} characters omitted from the middle ...]\n\n"
+                   + notice_text[-tail:])
     return (
-        f"SITE: {site}\n\nCHECKLIST RESULTS:\n{compact}\n\nNOTICE TEXT:\n{notice_text[:24000]}"
+        f"SITE: {site}\n\n{segment}\n\nCHECKLIST RESULTS:\n{compact}\n\nNOTICE TEXT:\n{excerpt}"
     )
 
 
@@ -349,8 +391,9 @@ async def audit(url: str, llm_json=None) -> dict:
             )
         raise ValueError("page text too short to audit (blocked, JS-rendered, or PDF)")
 
-    truncated = len(notice_text) > 40000
-    text = notice_text[:40000]
+    # The deterministic checklist runs on the FULL notice: regex scanning is cheap, and
+    # capping it here silently dropped real findings in long notices.
+    text = notice_text
 
     is_hub = bool(len(notice_text) < 6000 and len(re.findall(r'href="[^"]*privacy[^"]*"', last_html, re.I)) >= 3)
     if is_hub:
@@ -366,7 +409,8 @@ async def audit(url: str, llm_json=None) -> dict:
         "notice_url": notice_url,
         "fetched_at": None,
         "char_count": len(notice_text),
-        "truncated": truncated,
+        "truncated": len(notice_text) > LLM_TEXT_LIMIT,
+        "llm_input_truncated": len(notice_text) > LLM_TEXT_LIMIT,
         "is_hub": is_hub,
         "checks": checks,
         "scores": scores,
@@ -410,4 +454,3 @@ async def _try_notice(client: httpx.AsyncClient, candidate: str, baseline_len: i
     if _looks_like_notice(cfinal, ctext) or len(ctext) > max(baseline_len, 3000) * 1.5:
         return cfinal, ctext, cbody
     return None
-
