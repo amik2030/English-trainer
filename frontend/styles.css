@@ -307,3 +307,41 @@ tr:hover td { background: rgba(79,140,255,.04); }
 .aud-finding { border-left:3px solid var(--border); padding:6px 0 10px 12px; margin-bottom:10px; }
 .aud-finding .q { color:var(--muted); font-style:italic; font-size:12px; border-left:2px solid var(--border); padding-left:8px; margin:6px 0; }
 @media (max-width:600px){ .aud-row > input { min-width:0; flex:1 1 100%; } }
+
+/* ---------- Privacy portfolio monitor ---------- */
+.aud-monitor-head{margin-top:30px;align-items:flex-start}
+.aud-monitor-head h2{margin-bottom:4px}
+.aud-disclaimer{border:1px solid rgba(210,153,34,.3);background:rgba(210,153,34,.07);color:#d3b36b;padding:10px 13px;border-radius:9px;font-size:12px;line-height:1.55;margin:12px 0}
+.aud-monitor-form{margin:12px 0 14px}
+.aud-monitor-fields{display:grid;grid-template-columns:1.1fr 1.35fr 1fr auto auto auto;gap:9px;align-items:center}
+.aud-monitor-fields input{min-width:0;padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font:inherit;font-size:13px}
+.aud-monitor-fields input:focus{outline:none;border-color:var(--blue)}
+.mon-interval{font-size:12px;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:6px}
+.mon-interval select{padding:9px 7px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text)}
+.mon-qual{font-size:12px;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:6px}.mon-qual input{accent-color:var(--blue)}
+.aud-monitor-kpis{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr));gap:10px;margin:10px 0 20px}
+.mon-kpi{padding:13px 15px;border:1px solid var(--border);background:var(--panel);border-radius:10px;display:flex;flex-direction:column;gap:2px}
+.mon-kpi b{font-size:20px;font-variant-numeric:tabular-nums}.mon-kpi span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.mon-kpi.alert b{color:#f85149}
+.aud-monitor-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
+.aud-monitor-grid .section-head{display:flex;justify-content:space-between;align-items:center;margin:6px 0 10px}
+.aud-monitor-grid .section-head h2{font-size:16px;margin:0}
+.mon-site{margin-bottom:10px;padding:14px}
+.mon-site-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.mon-site-id{min-width:0;display:flex;flex-direction:column;gap:3px}
+.mon-site-id>b{font-size:14px}.mon-site-id>a{font-size:11.5px;color:var(--muted);word-break:break-all;text-decoration:none}.mon-site-id>a:hover{color:var(--blue)}
+.mon-site-id .mon-notice-url{font-size:10.5px;opacity:.82}
+.mon-site .grade-badge{width:52px;height:52px;border-radius:13px}.mon-site .grade-badge .g{font-size:21px}.mon-site .grade-badge .p{font-size:9.5px}
+.mon-spark{height:34px;width:100%;margin:6px 0}.mon-spark-empty{height:34px;display:flex;align-items:center;color:var(--muted);font-size:10.5px}
+.mon-meta{display:flex;gap:8px 13px;flex-wrap:wrap;color:var(--muted);font-size:10.5px;margin:4px 0 10px}
+.mon-status{border-radius:20px;padding:1px 7px;text-transform:uppercase;font-size:9px;letter-spacing:.04em;background:rgba(63,185,80,.13);color:#3fb950}
+.mon-status.needs_review{background:rgba(210,153,34,.15);color:#d29922}.mon-status.failed{background:rgba(248,81,73,.15);color:#f85149}.mon-status.scheduled{background:rgba(139,150,184,.15);color:var(--muted)}
+.mon-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.mon-actions .btn{font-size:10.5px;padding:5px 8px}
+.mon-review-list{display:flex;flex-direction:column;gap:9px;max-height:780px;overflow:auto;padding-right:2px}
+.mon-review{border:1px solid var(--border);background:var(--panel);border-radius:10px;padding:12px}
+.mon-review-head{display:flex;gap:7px;align-items:flex-start;font-size:12px;line-height:1.45}.mon-review-head b{font-weight:650}
+.mon-review .pill{flex-shrink:0}.mon-review-detail{color:var(--muted);line-height:1.5;white-space:pre-line;margin:8px 0 4px;font-size:11.5px}
+.aud-change-box{border:1px solid var(--border);background:var(--bg2);border-radius:9px;padding:10px 13px;margin:12px 0;font-size:12.5px}
+.aud-change-box ul{margin:7px 0 0;padding-left:20px}.aud-change-box li{padding:2px 0}
+@media(max-width:900px){.aud-monitor-fields{grid-template-columns:1fr 1fr}.aud-monitor-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.aud-monitor-fields{grid-template-columns:1fr}.aud-monitor-kpis{grid-template-columns:1fr 1fr}.mon-interval{justify-content:flex-start}}

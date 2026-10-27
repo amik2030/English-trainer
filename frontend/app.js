@@ -104,7 +104,7 @@
       $$(".screen").forEach((s) => s.classList.toggle("visible", s.id === id));
       if (id === "kb") loadKB();
       if (id === "review") loadQueue();
-      if (id === "auditor") loadAudits();
+      if (id === "auditor") { loadAudits(); loadMonitors(); }
     }));
     $$(".tab").forEach((t) => t.addEventListener("click", () => {
       $$(".tab").forEach((x) => x.classList.remove("active"));
@@ -791,19 +791,22 @@
 
     return `<div class="card" style="margin-top:16px"${id ? ` id="audit-${id}"` : ""}>
       <div class="grade-card">
-        <div class="grade-badge ${gradeClass(s.overall_grade)}">
-          <span class="g">${esc(s.overall_grade || "?")}</span>
-          <span class="p">${esc(s.overall_pct ?? 0)}%</span>
+        ${r.monitor_score_suppressed ? '<div class="aud-disclaimer" style="width:100%">Screening score withheld: this appears to be a privacy hub/index. Pin the applicable notice URL before relying on a score.</div>' : ""}
+        <div class="grade-badge ${r.monitor_score_suppressed ? "" : gradeClass(s.overall_grade)}">
+          <span class="g">${r.monitor_score_suppressed ? "—" : esc(s.overall_grade || "?")}</span>
+          <span class="p">${r.monitor_score_suppressed ? "review" : esc(s.overall_pct ?? 0) + "%"}</span>
         </div>
         <div style="flex:1;min-width:220px">
           <div style="font-weight:700;font-size:15px">${esc(r.label || r.notice_url || r.requested_url || "Audit")}</div>
           <div class="muted small" style="word-break:break-all">${esc(r.notice_url || "")}</div>
-          <div class="muted small" style="margin-top:4px">${esc(s.passed_count ?? 0)}/${esc(s.total_count ?? 0)} checks passed · ${esc((r.char_count || 0).toLocaleString())} chars analysed in full${r.llm_input_truncated ? ' · <b style="color:#d29922">AI review saw head+tail only</b>' : ""}${r.is_hub ? ' · <b style="color:#d29922">index page, not full notice</b>' : ""}</div>
+          <div class="muted small" style="margin-top:4px">${r.monitor_score_suppressed ? "Screening score withheld — this appears to be a notice hub" : `${esc(s.passed_count ?? 0)}/${esc(s.total_count ?? 0)} checks passed · ${esc((r.char_count || 0).toLocaleString())} chars analysed in full`}${r.llm_input_truncated ? ' · <b style="color:#d29922">AI review saw head+tail only</b>' : ""}${r.is_hub ? ' · <b style="color:#d29922">index page, not full notice</b>' : ""}</div>
         </div>
       </div>
       <div style="display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 4px">
         ${order.filter((k) => dom[k]).map((k) => domainBar(k, dom[k])).join("")}
       </div>
+      ${r.monitor_id ? `<div class="aud-disclaimer" style="margin-top:12px">Automated text-pattern screening only — not a legal opinion or determination of compliance.</div>` : ""}
+      ${r.review_changes ? `<div class="aud-change-box"><b>Scan comparison</b><div class="muted small">${(r.review_changes.new_findings || []).length} new finding(s) · ${(r.review_changes.recovered || []).length} recovered · ${(r.review_changes.ongoing || r.review_changes.still_failing || []).length} ongoing</div>${(r.created_reviews || []).length ? `<ul>${r.created_reviews.map(x => `<li><span class="pill ${esc(x.severity || "low")}">${esc(x.severity || "low")}</span> ${esc(x.title)}</li>`).join("")}</ul>` : ""}</div>` : ""}
       ${warnHtml}
       <h3 style="margin:18px 0 6px;font-size:14px">❌ Gaps (${fails.length})</h3>
       ${fails.length ? fails.map(checkRow).join("") : '<p class="muted small">No checklist failures. 🎉</p>'}
@@ -811,6 +814,7 @@
       ${passes.length ? `<details style="margin-top:12px"><summary class="muted small" style="cursor:pointer">Show ${passes.length} passed checks</summary><div style="margin-top:8px">${passes.map(checkRow).join("")}</div></details>` : ""}
       <div class="row-actions" style="margin-top:14px">
         ${r.notice_url ? `<a class="btn small" href="${esc(r.notice_url)}" target="_blank" rel="noopener">Open notice ↗</a>` : ""}
+        ${r.monitor_id && r.notice_url ? `<button class="btn small" data-mon-pin="${esc(r.monitor_id)}" data-notice-url="${esc(r.notice_url)}">${r.is_hub ? "Use this notice for monitor" : "Pin discovered notice URL"}</button>` : ""}
         ${id ? `<button class="btn small red" data-aud-del="${id}">Delete</button>` : ""}
       </div>
     </div>`;
@@ -834,7 +838,7 @@
       $("#aud-result").innerHTML = `<div class="card" style="color:#f85149;margin-top:14px">❌ ${esc(e.message)}</div>`;
     }
     $("#aud-loading").classList.add("hidden");
-    btn.disabled = false; btn.textContent = "Audit";
+    btn.disabled = false; btn.textContent = "Run one-off scan";
   }
 
   function wireAuditDelete() {
@@ -891,6 +895,53 @@
       wireAuditDelete();
     } catch (e) { el.innerHTML = `<p class="muted small">${esc(e.message)}</p>`; }
   }
+
+  function monitorGradeClass(grade) { return grade ? `g-${String(grade).toUpperCase()}` : ""; }
+
+  function monitorSpark(history) {
+    const points = (history || []).filter(x => x.status === "done" && Number.isFinite(Number(x.scores?.overall_pct)));
+    if (points.length < 2) return '<div class="mon-spark-empty">Trend will appear after another scan.</div>';
+    const vals = points.map(x => Number(x.scores.overall_pct));
+    const min = Math.min(...vals, 0), max = Math.max(...vals, 100), span = Math.max(max - min, 10), w=240, h=34;
+    const xy = vals.map((v,i) => `${(i/(vals.length-1))*w},${h-((v-min)/span)*h}`).join(" ");
+    const color = vals.at(-1) >= vals[0] ? "#3fb950" : "#f85149";
+    return `<svg viewBox="0 0 ${w} ${h}" class="mon-spark" preserveAspectRatio="none"><polyline points="${xy}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  function renderMonitors(data) {
+    const t=data.totals||{}; const sites=data.monitors||[];
+    $("#mon-kpis").innerHTML=`<div class="mon-kpi"><b>${esc(t.sites||0)}</b><span>websites</span></div><div class="mon-kpi"><b>${t.avg_score==null?"—":esc(t.avg_score)+"%"}</b><span>avg screening score</span></div><div class="mon-kpi ${t.high_pending?"alert":""}"><b>${esc(t.pending||0)}</b><span>pending review</span></div><div class="mon-kpi"><b>${esc(t.high_pending||0)}</b><span>high priority</span></div>`;
+    $("#mon-sites").innerHTML=sites.length?sites.map(m=>{
+      const status=m.last_status||"scheduled",grade=m.last_grade||"—";
+      return `<article class="card mon-site"><div class="mon-site-top"><div class="mon-site-id"><b>${esc(m.label)}</b><a href="${esc(m.site_url)}" target="_blank" rel="noopener">${esc(m.site_url)}</a>${m.notice_url?`<a class="mon-notice-url" href="${esc(m.notice_url)}" target="_blank" rel="noopener">Notice: ${esc(m.notice_url)}</a>`:""}</div><div class="grade-badge ${monitorGradeClass(grade)}" title="Screening only"><span class="g">${esc(grade)}</span><span class="p">${m.last_score==null?"—":esc(m.last_score)+"%"}</span></div></div>
+      ${monitorSpark(m.history)}<div class="mon-meta"><span class="mon-status ${status}">${esc(status)}</span><span>Last: ${m.last_scan_at?esc(new Date(m.last_scan_at).toLocaleString()):"Not scanned"}</span><span>Next: ${esc(new Date(m.next_scan_at).toLocaleString())}</span><span>Every ${esc(m.interval_hours)}h</span><span>${m.pending_reviews?`🧑‍⚖️ ${esc(m.pending_reviews)} to review`:"✓ No pending reviews"}</span></div>${m.last_error?`<div class="aud-warn">${esc(m.last_error)}</div>`:""}
+      <div class="mon-actions"><button class="btn small primary" data-mon-scan="${esc(m.id)}">Scan now</button><button class="btn small" data-mon-toggle="${esc(m.id)}" data-enabled="${m.enabled?"1":"0"}">${m.enabled?"Pause":"Resume"}</button><button class="btn small red" data-mon-delete="${esc(m.id)}">Remove</button></div></article>`;
+    }).join(""):'<div class="card muted small">No websites tracked yet. Add one above to start monitoring.</div>';
+    const reviews=data.reviews||[];
+    $("#mon-reviews").innerHTML=reviews.length?`<div class="mon-review-list">${reviews.map(r=>{const m=sites.find(x=>String(x.id)===String(r.monitor_id));return `<article class="mon-review"><div class="mon-review-head"><span class="pill ${esc(r.severity)}">${esc(r.severity)}</span><b>${esc(r.title)}</b></div><div class="muted small">${esc(m?.label||"Website")} · ${esc(String(r.kind).replace(/_/g," "))} · ${esc(new Date(r.created_at).toLocaleString())}</div>${r.detail?`<p class="small mon-review-detail">${esc(r.detail)}</p>`:""}<div class="mon-actions"><button class="btn small" data-mon-review="${esc(r.id)}" data-status="in_review">Reviewing</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="resolved">Resolve</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="accepted">Accept risk</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="false_positive">False positive</button></div></article>`}).join("")}</div>`:'<div class="card muted small">✨ Review queue clear — no pending findings.</div>';
+    wireMonitorActions();
+  }
+
+  async function loadMonitors() {
+    if(!$("#mon-sites"))return;
+    try{renderMonitors(await api("/api/auditor/monitors"));}
+    catch(e){$("#mon-sites").innerHTML=`<div class="card" style="color:var(--red)">Monitor unavailable: ${esc(e.message)}. The database migration may need to be applied.</div>`;}
+  }
+
+  function wireMonitorActions() {
+    $$('[data-mon-pin]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound="1";b.onclick=async()=>{b.disabled=true;try{await api(`/api/auditor/monitors/${b.dataset.monPin}/notice-url`,{method:"POST",body:{notice_url:b.dataset.noticeUrl}});toast("Notice URL pinned — rescan is due");await loadMonitors();}catch(e){toast("❌ "+e.message);}finally{b.disabled=false;}};});
+    $$('[data-mon-scan]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound="1";b.onclick=async()=>{b.disabled=true;b.textContent="Scanning…";try{await api(`/api/auditor/monitors/${b.dataset.monScan}/scan-lock`,{method:"POST"});const r=await api(`/api/auditor/monitors/${b.dataset.monScan}/scan`,{method:"POST"});$("#aud-result").innerHTML=auditCard(r,r.id);wireAuditDelete();toast(`${(r.created_reviews||[]).length} new review item(s)`);await loadMonitors();window.scrollTo({top:0,behavior:"smooth"});}catch(e){toast("❌ "+e.message);}finally{b.disabled=false;b.textContent="Scan now";}};});
+    $$('[data-mon-toggle]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound="1";b.onclick=async()=>{b.disabled=true;try{await api(`/api/auditor/monitors/${b.dataset.monToggle}`,{method:"PATCH",body:{enabled:b.dataset.enabled!=="1"}});await loadMonitors();}catch(e){toast("❌ "+e.message);b.disabled=false;}};});
+    $$('[data-mon-delete]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound="1";b.onclick=async()=>{if(!confirm("Stop monitoring this site and delete its scan/review history?"))return;b.disabled=true;try{await api(`/api/auditor/monitors/${b.dataset.monDelete}`,{method:"DELETE"});toast("Website monitor removed");await loadMonitors();}catch(e){toast("❌ "+e.message);b.disabled=false;}};});
+    $$('[data-mon-review]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound="1";b.onclick=async()=>{b.disabled=true;try{await api(`/api/auditor/monitor-reviews/${b.dataset.monReview}`,{method:"PATCH",body:{status:b.dataset.status}});toast("Review updated");await loadMonitors();}catch(e){toast("❌ "+e.message);b.disabled=false;}};});
+  }
+
+  $("#mon-add-btn")?.addEventListener("click",async()=>{
+    const url=$("#mon-url").value.trim();if(!url)return toast("Enter a website URL");const b=$("#mon-add-btn");b.disabled=true;b.textContent="Adding…";
+    try{const out=await api("/api/auditor/monitors",{method:"POST",body:{url,label:$("#mon-label").value.trim()||null,notice_url:$("#mon-notice-url").value.trim()||null,interval_hours:Number($("#mon-interval").value),qualitative_review:$("#mon-qualitative").checked}});$("#mon-url").value="";$("#mon-notice-url").value="";$("#mon-label").value="";$("#mon-qualitative").checked=false;toast(out.existing?"Monitor updated":"Website added — first scan is due");await loadMonitors();}
+    catch(e){toast("❌ "+e.message);}finally{b.disabled=false;b.textContent="＋ Track website";}
+  });
+  $("#mon-refresh")?.addEventListener("click",loadMonitors);
 
   $("#aud-btn")?.addEventListener("click", runAudit);
   $("#aud-url")?.addEventListener("keydown", (e) => { if (e.key === "Enter") runAudit(); });

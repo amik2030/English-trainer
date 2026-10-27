@@ -6,6 +6,14 @@ Roles: reviewer (full HITL control) | user (ask + browse approved KB).
 """
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from contextlib import asynccontextmanager
+import asyncio
+import logging
+import secrets
+from datetime import timedelta
+from urllib.parse import urlparse
+import ipaddress
+import socket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -39,7 +47,25 @@ PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL", "")  # for magic-link redire
 client = OpenAI(api_key=OPENAI_API_KEY)
 admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-app = FastAPI(title="Pocket DDP Workbench")
+logger = logging.getLogger("ddp.notice_monitor")
+monitor_stop = asyncio.Event()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Lightweight in-process scheduler. DB leases prevent overlapping scans if
+    # a web worker restarts while it is fetching a notice.
+    task = asyncio.create_task(_monitor_scheduler())
+    yield
+    monitor_stop.set()
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+app = FastAPI(title="Pocket DDP Workbench", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
@@ -597,12 +623,315 @@ async def set_role(request: Request):
 
 # ---------------- PRIVACY NOTICE AUDITOR ----------------
 from notice_auditor import audit as audit_notice, ALL_CHECKS
+from privacy_monitor import compare_results, result_fingerprint
 
 
 class AuditRequest(BaseModel):
     url: str
     label: Optional[str] = None
     deep: bool = True  # qualitative LLM pass on top of the deterministic checklist
+
+
+class MonitorRequest(BaseModel):
+    url: str
+    label: Optional[str] = None
+    notice_url: Optional[str] = None
+    interval_hours: int = 168
+    qualitative_review: bool = False
+
+
+class MonitorUpdate(BaseModel):
+    label: Optional[str] = None
+    notice_url: Optional[str] = None
+    interval_hours: Optional[int] = None
+    qualitative_review: Optional[bool] = None
+    enabled: Optional[bool] = None
+
+
+class MonitorReviewUpdate(BaseModel):
+    status: str  # in_review | resolved | accepted | false_positive
+    resolution_note: Optional[str] = None
+
+
+def _public_http_url(raw: str) -> str:
+    """Normalize a public website URL; reject local/private targets for scans."""
+    raw = str(raw or "").strip()
+    if not raw:
+        raise HTTPException(400, "website URL required")
+    if not raw.lower().startswith(("http://", "https://")):
+        raw = "https://" + raw.lstrip("/")
+    try:
+        p = urlparse(raw)
+        if p.scheme not in ("http", "https") or not p.hostname or p.username or p.password:
+            raise ValueError("invalid URL")
+        host = p.hostname.rstrip(".").lower()
+        if host in {"localhost", "localhost.localdomain"} or host.endswith((".localhost", ".local", ".internal")):
+            raise ValueError("private/local hostnames are not allowed")
+        try:
+            addresses = [ipaddress.ip_address(host)]
+        except ValueError:
+            addresses = [ipaddress.ip_address(x[4][0]) for x in socket.getaddrinfo(host, p.port or (443 if p.scheme == "https" else 80), type=socket.SOCK_STREAM)]
+        if not addresses or any(not (ip.is_global) for ip in addresses):
+            raise ValueError("website must resolve to a public IP address")
+        return p.geturl()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"invalid or non-public website URL: {e}")
+
+
+def _monitor_owned(monitor_id: int, prof: dict) -> dict:
+    rows = admin.table("website_monitors").select("*").eq("id", monitor_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "website monitor not found")
+    if rows[0]["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your website monitor")
+    return rows[0]
+
+
+def _safe_latest_scan(monitor_id: int, user_id: str) -> Optional[dict]:
+    rows = (admin.table("notice_scans").select("id, monitor_id, status, scores, result, created_at, notice_url, error, scan_trigger")
+            .eq("monitor_id", monitor_id).eq("user_id", user_id)
+            .order("created_at", desc=True).limit(1).execute().data or [])
+    return rows[0] if rows else None
+
+
+def _monitor_scan_history(monitor_id: int, user_id: str, limit: int = 30) -> list[dict]:
+    rows = (admin.table("notice_scans").select("id, result, scores, notice_fingerprint, created_at, status")
+            .eq("monitor_id", monitor_id).eq("user_id", user_id)
+            .eq("status", "done").order("created_at", desc=True)
+            .limit(limit).execute().data or [])
+    return [r.get("result") or {} for r in reversed(rows)]
+
+
+def _review_is_muted(monitor_id: int, user_id: str, key: str) -> bool:
+    rows = (admin.table("monitor_reviews").select("id")
+            .eq("monitor_id", monitor_id).eq("user_id", user_id)
+            .eq("finding_key", key).in_("status", ["accepted", "false_positive"])
+            .limit(1).execute().data or [])
+    return bool(rows)
+
+
+def _active_review(monitor_id: int, user_id: str, key: str) -> Optional[dict]:
+    rows = (admin.table("monitor_reviews").select("id, status")
+            .eq("monitor_id", monitor_id).eq("user_id", user_id)
+            .eq("finding_key", key).in_("status", ["pending", "in_review"])
+            .limit(1).execute().data or [])
+    return rows[0] if rows else None
+
+
+def _insert_monitor_review(monitor: dict, scan_id: Optional[int], item: dict) -> Optional[dict]:
+    key = str(item.get("finding_key") or item.get("kind") or "notice_changed")
+    if item.get("kind") in ("notice_changed", "score_drop", "scan_failed", "notice_hub"):
+        active = (admin.table("monitor_reviews").select("id")
+                  .eq("monitor_id", monitor["id"]).eq("user_id", monitor["user_id"])
+                  .eq("finding_key", key).in_("status", ["pending", "in_review"])
+                  .limit(1).execute().data or [])
+        if active:
+            return None
+    # Accepted/false-positive findings remain muted; every event class dedupes
+    # against an already-open identical item (including scan failures/hub alerts).
+    if item.get("kind") not in ("notice_changed", "score_drop", "scan_failed", "notice_hub"):
+        if _review_is_muted(monitor["id"], monitor["user_id"], key):
+            return None
+    if _active_review(monitor["id"], monitor["user_id"], key):
+        return None
+    row = {
+        "user_id": monitor["user_id"],
+        "monitor_id": monitor["id"],
+        "scan_id": scan_id,
+        "finding_key": key,
+        "kind": item.get("kind", "new_finding"),
+        "severity": item.get("severity", "medium"),
+        "title": item.get("title", "Privacy notice needs human review"),
+        "detail": item.get("detail", ""),
+        "status": item.get("status", "pending"),
+    }
+    try:
+        ins = admin.table("monitor_reviews").insert(row).execute()
+        return (ins.data or [None])[0]
+    except Exception as e:
+        # Concurrent scheduler/manual click can race the partial unique index.
+        logger.warning("review insert skipped (likely dedupe race): %s", e)
+        return None
+
+
+async def _perform_monitor_scan(monitor: dict, trigger: str = "scheduled") -> dict:
+    """Run one scan, persist its snapshot, diff against the prior snapshot, queue deltas."""
+    monitor_id, user_id = monitor["id"], monitor["user_id"]
+    previous = _safe_latest_scan(monitor_id, user_id)
+    history = _monitor_scan_history(monitor_id, user_id)
+    url = monitor.get("notice_url") or monitor["site_url"]
+    scan_id = None
+    status = "failed"
+    try:
+        result = await audit_notice(url, llm_json=_llm_json if monitor.get("qualitative_review") else None)
+        result["fetched_at"] = _now()
+        result["label"] = monitor["label"]
+        result["monitor_id"] = monitor_id
+        result["trigger"] = trigger
+        result["site_url"] = monitor["site_url"]
+        is_hub = bool(result.get("is_hub"))
+        result["monitor_score_suppressed"] = is_hub
+        result["review_changes"] = (
+            {"new_findings": [], "recovered": [], "still_failing": [], "ongoing": []}
+            if is_hub else compare_results(previous.get("result") if previous else None, result, history[:-1] if history else [])
+        )
+        result["review_changes"]["new_findings"] = [
+            x for x in result["review_changes"]["new_findings"]
+            if not _review_is_muted(monitor_id, user_id, x["finding_key"])
+            and not _active_review(monitor_id, user_id, x["finding_key"])
+        ]
+        if is_hub:
+            result.setdefault("warnings", []).append("This is a privacy hub/index. Human review is needed to pin the relevant notice before treating the score as meaningful.")
+        fingerprint = result.get("notice_fingerprint") or result_fingerprint(result)
+
+        status = "done"
+        ins = admin.table("notice_scans").insert({
+            "user_id": user_id,
+            "monitor_id": monitor_id,
+            "label": monitor["label"],
+            "site_url": monitor["site_url"],
+            "notice_url": result.get("notice_url") or "",
+            "status": status,
+            "scores": {} if is_hub else (result.get("scores") or {}),
+            "result": result,
+            "scan_trigger": trigger,
+            "notice_fingerprint": fingerprint,
+        }).execute()
+        scan_id = (ins.data or [{}])[0].get("id")
+        created_reviews = []
+        ongoing_keys = {x["finding_key"] for x in result["review_changes"].get("ongoing", [])}
+
+        if is_hub:
+            review = _insert_monitor_review(monitor, scan_id, {
+                "finding_key": "notice_hub", "kind": "notice_hub", "severity": "medium",
+                "title": f"{monitor['label']}: discovered a privacy hub, not a single notice",
+                "detail": "The fetched page looks like an index to multiple notices. Its checklist score is suppressed to avoid a misleading compliance impression. Pin the applicable notice URL in monitor settings, then scan again.",
+            })
+            if review:
+                created_reviews.append(review)
+        else:
+            for finding in result["review_changes"]["new_findings"]:
+                review = _insert_monitor_review(monitor, scan_id, finding)
+                if review:
+                    created_reviews.append(review)
+
+        # Once a previously flagged gap is no longer failing, close every open
+        # review row for that key, regardless of its original event kind.
+        recovered_keys = {x["finding_key"] for x in result["review_changes"]["recovered"]}
+        for key in recovered_keys:
+            rows = (admin.table("monitor_reviews").select("id")
+                    .eq("monitor_id", monitor_id).eq("user_id", user_id)
+                    .eq("finding_key", key).in_("status", ["pending", "in_review"])
+                    .execute().data or [])
+            for row in rows:
+                admin.table("monitor_reviews").update({
+                    "status": "auto_resolved", "resolved_at": _now(),
+                    "resolution_note": "The corresponding check passed on a later scan.",
+                    "updated_at": _now(),
+                }).eq("id", row["id"]).execute()
+
+        # Automatically close pending items whose checks recovered.
+        for item in result["review_changes"]["recovered"]:
+            try:
+                admin.table("monitor_reviews").insert({
+                    "user_id": user_id, "monitor_id": monitor_id, "scan_id": scan_id,
+                    "finding_key": "recovered:" + item["finding_key"],
+                    "kind": "recovered", "severity": "low",
+                    "title": "Recovered: " + item.get("title", item["finding_key"]),
+                    "detail": "The check now passes. This recovery is recorded for history only.",
+                    "status": "auto_resolved", "resolved_at": _now(),
+                }).execute()
+            except Exception as e:
+                logger.warning("recovery event insert skipped: %s", e)
+
+        # A changed notice warrants review even when the deterministic check
+        # vector remains identical. Store the hash, not copied notice text.
+        prev_fp = (previous or {}).get("notice_fingerprint")
+        if not is_hub and prev_fp and fingerprint and prev_fp != fingerprint:
+            review = _insert_monitor_review(monitor, scan_id, {
+                "finding_key": "notice_changed",
+                "kind": "notice_changed", "severity": "low",
+                "title": f"{monitor['label']}: privacy notice text changed",
+                "detail": "The fetched notice text changed since the previous scan. Review for substantive changes; boilerplate or page layout changes can also alter this fingerprint.",
+            })
+            if review:
+                created_reviews.append(review)
+
+        old_score = ((previous or {}).get("scores") or {}).get("overall_pct")
+        new_score = None if is_hub else (result.get("scores") or {}).get("overall_pct")
+        if old_score is not None and new_score is not None and old_score - new_score >= 5:
+            review = _insert_monitor_review(monitor, scan_id, {
+                "finding_key": f"score_drop:{old_score}:{new_score}",
+                "kind": "score_drop", "severity": "medium",
+                "title": f"{monitor['label']}: screening score fell {old_score - new_score} points",
+                "detail": f"Previous screening score: {old_score}%. Current: {new_score}%. Pattern-based screening only; compare the underlying notice.",
+            })
+            if review:
+                created_reviews.append(review)
+
+        # Persist current monitoring summary and release the scheduler lease.
+        update = {
+            "last_scan_at": _now(),
+            "next_scan_at": (datetime.now(timezone.utc) + timedelta(hours=monitor["interval_hours"])).isoformat(),
+            "last_status": "needs_review" if (created_reviews or is_hub) else "done",
+            "last_score": new_score,
+            "last_grade": None if is_hub else (result.get("scores") or {}).get("overall_grade"),
+            "previous_score": old_score,
+            "latest_scan_id": scan_id,
+            "last_error": None,
+            "lease_until": None,
+            "updated_at": _now(),
+        }
+        admin.table("website_monitors").update(update).eq("id", monitor_id).execute()
+        result["id"] = scan_id
+        result["created_reviews"] = created_reviews
+        return result
+    except Exception as e:
+        logger.exception("monitor scan failed for %s", monitor_id)
+        if scan_id is None:
+            failed = admin.table("notice_scans").insert({
+                "user_id": user_id, "monitor_id": monitor_id, "label": monitor["label"],
+                "site_url": monitor["site_url"], "notice_url": monitor.get("notice_url") or "",
+                "status": "failed", "error": str(e)[:1000],
+                "scores": {}, "result": {"error": str(e), "trigger": trigger},
+                "scan_trigger": trigger,
+            }).execute()
+            scan_id = (failed.data or [{}])[0].get("id")
+        _insert_monitor_review(monitor, scan_id, {
+            "finding_key": "scan_failed", "kind": "scan_failed", "severity": "high",
+            "title": f"{monitor['label']}: scheduled scan failed",
+            "detail": str(e)[:1000],
+        })
+        admin.table("website_monitors").update({
+            "last_scan_at": _now(),
+            "next_scan_at": (datetime.now(timezone.utc) + timedelta(hours=min(monitor["interval_hours"], 24))).isoformat(),
+            "last_status": "failed", "last_error": str(e)[:1000],
+            "lease_until": None, "updated_at": _now(),
+        }).eq("id", monitor_id).execute()
+        raise
+
+
+async def _monitor_scheduler():
+    """Claim and scan a small due batch periodically while the web process is up."""
+    while not monitor_stop.is_set():
+        try:
+            claimed = admin.rpc("claim_due_website_monitors", {"p_limit": 3}).execute().data or []
+            for monitor in claimed:
+                try:
+                    await _perform_monitor_scan(monitor, "scheduled")
+                except Exception:
+                    # Scan failure is persisted; continue servicing other monitors.
+                    pass
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("website monitor scheduler pass failed")
+        try:
+            await asyncio.wait_for(monitor_stop.wait(), timeout=60)
+        except asyncio.TimeoutError:
+            pass
 
 
 @app.get("/api/auditor/checks")
@@ -629,6 +958,9 @@ async def auditor_scan(req: AuditRequest, request: Request):
 
     result["fetched_at"] = _now()
     result["label"] = (req.label or "").strip()[:200] or None
+    result["trigger"] = "manual"
+    result["monitor_id"] = None
+    result["review_changes"] = {"new_findings": [], "recovered": [], "still_failing": [], "ongoing": []}
     ins = admin.table("notice_scans").insert({
         "user_id": prof["id"],
         "label": result["label"],
@@ -637,6 +969,8 @@ async def auditor_scan(req: AuditRequest, request: Request):
         "status": "done",
         "scores": result.get("scores") or {},
         "result": result,
+        "scan_trigger": "manual",
+        "notice_fingerprint": result.get("notice_fingerprint"),
     }).execute()
     return {"id": (ins.data or [{}])[0].get("id"), **result}
 
@@ -672,6 +1006,185 @@ async def auditor_scan_delete(scan_id: int, request: Request):
         raise HTTPException(403, "not your scan")
     admin.table("notice_scans").delete().eq("id", scan_id).execute()
     return {"ok": True}
+
+
+@app.get("/api/auditor/monitors")
+async def auditor_monitors(request: Request):
+    prof = await current_user(request)
+    q = admin.table("website_monitors").select("*")
+    q = q.eq("user_id", prof["id"])
+    monitors = q.order("created_at", desc=True).limit(200).execute().data or []
+    if not monitors:
+        return {"monitors": [], "reviews": [], "totals": {"sites": 0, "pending": 0, "avg_score": None}}
+    ids = [m["id"] for m in monitors]
+    scans = (admin.table("notice_scans").select("id, monitor_id, status, scores, created_at, notice_url, scan_trigger")
+             .in_("monitor_id", ids).order("created_at", desc=True).limit(min(1000, len(ids) * 30)).execute().data or [])
+    by_monitor = {}
+    for scan in scans:
+        by_monitor.setdefault(scan["monitor_id"], []).append(scan)
+    reviews = (admin.table("monitor_reviews").select("*").eq("user_id", prof["id"]).in_("monitor_id", ids)
+               .eq("status", "pending").order("created_at", desc=True).limit(500).execute().data or [])
+    pending_by_monitor = {}
+    for review in reviews:
+        pending_by_monitor[review["monitor_id"]] = pending_by_monitor.get(review["monitor_id"], 0) + 1
+    for m in monitors:
+        history = by_monitor.get(m["id"], [])
+        m["history"] = list(reversed(history[:30]))
+        m["pending_reviews"] = pending_by_monitor.get(m["id"], 0)
+        m["latest_scan"] = history[0] if history else None
+    scores = [m["last_score"] for m in monitors if m.get("last_score") is not None]
+    return {
+        "monitors": monitors,
+        "reviews": reviews,
+        "totals": {
+            "sites": len(monitors), "pending": len(reviews),
+            "high_pending": sum(1 for r in reviews if r.get("severity") == "high"),
+            "avg_score": round(sum(scores) / len(scores)) if scores else None,
+        },
+    }
+
+
+@app.post("/api/auditor/monitors")
+async def auditor_monitor_create(req: MonitorRequest, request: Request):
+    prof = await current_user(request)
+    site_url = _public_http_url(req.url)
+    if req.notice_url:
+        notice_url = _public_http_url(req.notice_url)
+    else:
+        notice_url = None
+    interval = int(req.interval_hours)
+    if interval < 6 or interval > 8760:
+        raise HTTPException(400, "interval_hours must be from 6 (minimum) to 8760 (yearly)")
+    label = (req.label or "").strip()[:200] or (urlparse(site_url).hostname or site_url)
+    existing = (admin.table("website_monitors").select("id")
+                .eq("user_id", prof["id"]).eq("site_url", site_url).execute().data or [])
+    values = {
+        "label": label, "notice_url": notice_url, "interval_hours": interval,
+        "qualitative_review": bool(req.qualitative_review),
+            "enabled": True, "next_scan_at": _now(), "updated_at": _now(),
+            "last_status": "scheduled", "last_error": None,
+    }
+    if existing:
+        row = admin.table("website_monitors").update(values).eq("id", existing[0]["id"]).execute().data[0]
+        return {"monitor": row, "existing": True}
+    values.update({"user_id": prof["id"], "site_url": site_url, "last_status": "scheduled"})
+    row = admin.table("website_monitors").insert(values).execute().data[0]
+    return {"monitor": row, "existing": False}
+
+
+@app.post("/api/auditor/monitors/{monitor_id}/notice-url")
+async def auditor_monitor_set_notice_url(monitor_id: int, request: Request):
+    """Pin the canonical notice URL discovered from an existing audit result."""
+    prof = await current_user(request)
+    monitor = _monitor_owned(monitor_id, prof)
+    body = await request.json()
+    raw = str(body.get("notice_url") or "").strip()
+    if not raw:
+        raise HTTPException(400, "notice_url required")
+    notice_url = _public_http_url(raw)
+    out = admin.table("website_monitors").update({
+        "notice_url": notice_url, "next_scan_at": _now(), "updated_at": _now(),
+    }).eq("id", monitor_id).execute().data
+    return {"monitor": (out or [monitor])[0]}
+
+
+@app.post("/api/auditor/monitors/{monitor_id}/scan-lock")
+async def auditor_monitor_scan_lock(monitor_id: int, request: Request):
+    """Acquire a short DB-backed lock for a user-triggered scan."""
+    prof = await current_user(request)
+    monitor = _monitor_owned(monitor_id, prof)
+    now = _now()
+    lease = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+    out = (admin.table("website_monitors").update({"lease_until": lease, "updated_at": now})
+           .eq("id", monitor_id).eq("enabled", True)
+           .or_(f"lease_until.is.null,lease_until.lt.{now}")
+           .execute().data or [])
+    if not out:
+        raise HTTPException(409, "a scan is already running or this monitor is paused")
+    return {"monitor": out[0]}
+
+
+@app.patch("/api/auditor/monitors/{monitor_id}")
+async def auditor_monitor_update(monitor_id: int, req: MonitorUpdate, request: Request):
+    prof = await current_user(request)
+    monitor = _monitor_owned(monitor_id, prof)
+    updates = {"updated_at": _now()}
+    if req.label is not None:
+        label = req.label.strip()[:200]
+        if not label:
+            raise HTTPException(400, "label cannot be empty")
+        updates["label"] = label
+    if req.notice_url is not None:
+        updates["notice_url"] = _public_http_url(req.notice_url) if req.notice_url.strip() else None
+        updates["next_scan_at"] = _now()
+    if req.interval_hours is not None:
+        if req.interval_hours < 6 or req.interval_hours > 8760:
+            raise HTTPException(400, "interval_hours must be from 6 to 8760")
+        updates["interval_hours"] = req.interval_hours
+        updates["next_scan_at"] = _now()
+    if req.qualitative_review is not None:
+        updates["qualitative_review"] = req.qualitative_review
+    if req.enabled is not None:
+        updates["enabled"] = req.enabled
+        if req.enabled:
+            updates["next_scan_at"] = _now()
+    row = admin.table("website_monitors").update(updates).eq("id", monitor_id).execute().data
+    return {"monitor": (row or [monitor])[0]}
+
+
+@app.delete("/api/auditor/monitors/{monitor_id}")
+async def auditor_monitor_delete(monitor_id: int, request: Request):
+    prof = await current_user(request)
+    _monitor_owned(monitor_id, prof)
+    admin.table("website_monitors").delete().eq("id", monitor_id).execute()
+    return {"ok": True}
+
+
+@app.post("/api/auditor/monitors/{monitor_id}/scan")
+async def auditor_monitor_scan(monitor_id: int, request: Request):
+    prof = await current_user(request)
+    monitor = _monitor_owned(monitor_id, prof)
+    if not monitor.get("lease_until") or monitor["lease_until"] <= _now():
+        raise HTTPException(409, "acquire a scan lock before running the scan")
+    try:
+        result = await _perform_monitor_scan(monitor, "manual_monitor")
+        return result
+    except Exception as e:
+        raise HTTPException(502, f"monitor scan failed: {e}")
+
+
+@app.get("/api/auditor/monitor-reviews")
+async def auditor_monitor_reviews(request: Request, status: str = "pending", limit: int = 200):
+    prof = await current_user(request)
+    allowed = {"pending", "in_review", "resolved", "accepted", "false_positive", "auto_resolved"}
+    if status not in allowed:
+        raise HTTPException(400, "invalid review status")
+    q = admin.table("monitor_reviews").select("*").eq("status", status)
+    if prof.get("role") != "reviewer":
+        q = q.eq("user_id", prof["id"])
+    rows = q.order("created_at", desc=True).limit(min(max(limit, 1), 500)).execute().data or []
+    return {"reviews": rows}
+
+
+@app.patch("/api/auditor/monitor-reviews/{review_id}")
+async def auditor_monitor_review_update(review_id: int, req: MonitorReviewUpdate, request: Request):
+    prof = await current_user(request)
+    if req.status not in ("in_review", "resolved", "accepted", "false_positive"):
+        raise HTTPException(400, "status must be in_review|resolved|accepted|false_positive")
+    rows = admin.table("monitor_reviews").select("*").eq("id", review_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "monitor review not found")
+    review = rows[0]
+    if review["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your review item")
+    update = {
+        "status": req.status,
+        "resolution_note": (req.resolution_note or "").strip()[:1000] or None,
+        "updated_at": _now(),
+        "resolved_at": None if req.status == "in_review" else _now(),
+    }
+    out = admin.table("monitor_reviews").update(update).eq("id", review_id).execute().data
+    return {"review": (out or [review])[0]}
 
 
 # ---------------- static frontend (mount last) ----------------

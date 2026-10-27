@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pocket DDP Workbench</title>
 <meta http-equiv="Cache-Control" content="no-store">
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=10">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
@@ -259,12 +259,12 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
     <section id="auditor" class="screen">
       <div class="eyebrow">Compliance tooling</div>
       <h1>Privacy Notice Auditor</h1>
-      <p class="lede">Point it at a site or a notice URL. It fetches the notice, runs the GDPR Art. 13 / ePrivacy Art. 5(3) transparency checklist, then adds a qualitative review of what pattern matching can't see.</p>
+      <p class="lede">Screen privacy notices over time with a GDPR Art. 13 / ePrivacy Art. 5(3) checklist and optional qualitative review. Scores are screening signals for human follow-up — not a legal opinion or a compliance determination.</p>
 
       <div class="card aud-form">
         <div class="aud-row">
           <input id="aud-url" placeholder="https://company.com  or  https://company.com/privacy" maxlength="500">
-          <button class="btn primary" id="aud-btn">Audit</button>
+          <button class="btn primary" id="aud-btn">Run one-off scan</button>
         </div>
         <div class="aud-row" style="margin-top:10px">
           <input id="aud-label" placeholder="Label (optional) — e.g. 'Acme · client onboarding'" maxlength="200">
@@ -277,6 +277,27 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
       </div>
       <div id="aud-result"></div>
 
+      <div class="section-head aud-monitor-head"><div><h2>🛡 Website Compliance Monitor</h2>
+        <p class="muted small">Track sites over time. Changes and newly detected gaps are queued for your review.</p></div></div>
+      <div class="aud-disclaimer">Screening signals only — not a legal opinion or a compliance determination. The scanner checks text patterns; it does not verify that a notice is accurate or matches actual processing.</div>
+      <div class="card aud-monitor-form">
+        <h3>Track a website</h3>
+        <div class="aud-monitor-fields">
+          <input id="mon-url" placeholder="Website URL (https://company.com)" maxlength="500">
+          <input id="mon-notice-url" placeholder="Privacy notice URL (optional; auto-discover)" maxlength="500">
+          <input id="mon-label" placeholder="Label (optional)" maxlength="200">
+          <label class="mon-interval">Check every
+            <select id="mon-interval"><option value="24">24 hours</option><option value="168" selected>7 days</option><option value="336">14 days</option><option value="720">30 days</option></select>
+          </label>
+          <label class="mon-qual"><input type="checkbox" id="mon-qualitative"> Optional AI review</label>
+          <button class="btn primary" id="mon-add-btn">＋ Track website</button>
+        </div>
+      </div>
+      <div class="aud-monitor-kpis" id="mon-kpis"></div>
+      <div class="aud-monitor-grid">
+        <div><div class="section-head"><h2>Websites</h2><button class="btn small" id="mon-refresh">Refresh</button></div><div id="mon-sites"><span class="spin"></span></div></div>
+        <div><div class="section-head"><h2>🧑‍⚖️ Human review queue</h2></div><div id="mon-reviews"><span class="spin"></span></div></div>
+      </div>
       <div class="section-head"><h2>🗂 Past audits</h2></div>
       <div id="aud-history"><span class="spin"></span></div>
     </section>
@@ -308,6 +329,6 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
   </main>
 </div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

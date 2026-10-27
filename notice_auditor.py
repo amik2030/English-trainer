@@ -11,6 +11,9 @@ specifics). All findings are advisory — the reviewer decides what matters.
 from __future__ import annotations
 
 import re
+import hashlib
+import socket
+import ipaddress
 from dataclasses import dataclass, field
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -55,15 +58,47 @@ def html_to_text(html: str) -> str:
     return text
 
 
+def _require_public_target(url: str) -> None:
+    """Defend manual and scheduled scans against local/private SSRF targets."""
+    p = urlparse(url)
+    host = (p.hostname or "").rstrip(".").lower()
+    if p.scheme not in ("http", "https") or not host or p.username or p.password:
+        raise ValueError("invalid website URL")
+    if host in {"localhost", "localhost.localdomain"} or host.endswith((".localhost", ".local", ".internal")):
+        raise ValueError("private/local hosts cannot be scanned")
+    try:
+        addresses = [ipaddress.ip_address(host)]
+    except ValueError:
+        try:
+            addresses = [ipaddress.ip_address(x[4][0]) for x in socket.getaddrinfo(
+                host, p.port or (443 if p.scheme == "https" else 80), type=socket.SOCK_STREAM
+            )]
+        except OSError as e:
+            raise ValueError(f"could not resolve website host: {e}") from e
+    if not addresses or any(not a.is_global for a in addresses):
+        raise ValueError("website must resolve to public IP addresses")
+
+
 async def fetch(url: str, client: httpx.AsyncClient) -> tuple[str, str]:
-    """Return (final_url, text). Follows redirects; rejects non-HTML."""
-    r = await client.get(url, headers={"User-Agent": UA, "Accept-Language": "en,de;q=0.8,fr;q=0.6"})
-    r.raise_for_status()
-    ctype = r.headers.get("content-type", "")
-    if "html" not in ctype and "text" not in ctype:
-        raise ValueError(f"not an HTML page ({ctype or 'unknown type'})")
-    body = r.text[:MAX_BYTES]
-    return str(r.url), body
+    """Return (final_url, text), validating every redirect target as public."""
+    current = url
+    for _ in range(7):
+        _require_public_target(current)
+        r = await client.get(current, headers={"User-Agent": UA, "Accept-Language": "en,de;q=0.8,fr;q=0.6"},
+                             follow_redirects=False)
+        if r.status_code in (301, 302, 303, 307, 308):
+            location = r.headers.get("location")
+            if not location:
+                raise ValueError("website returned redirect without a target")
+            current = urljoin(str(r.url), location)
+            continue
+        r.raise_for_status()
+        ctype = r.headers.get("content-type", "")
+        if "html" not in ctype and "text" not in ctype:
+            raise ValueError(f"not an HTML page ({ctype or 'unknown type'})")
+        body = r.content[:MAX_BYTES].decode(r.encoding or "utf-8", errors="replace")
+        return str(r.url), body
+    raise ValueError("too many redirects")
 
 
 def common_paths(base_url: str) -> list[str]:
@@ -409,6 +444,11 @@ async def audit(url: str, llm_json=None) -> dict:
         "notice_url": notice_url,
         "fetched_at": None,
         "char_count": len(notice_text),
+        # Persist a fingerprint, never the full notice text: this is enough to
+        # detect edits without retaining copied privacy-notice content.
+        "notice_fingerprint": hashlib.sha256(
+            re.sub(r"\s+", " ", notice_text).strip().lower().encode("utf-8")
+        ).hexdigest(),
         "truncated": len(notice_text) > LLM_TEXT_LIMIT,
         "llm_input_truncated": len(notice_text) > LLM_TEXT_LIMIT,
         "is_hub": is_hub,
