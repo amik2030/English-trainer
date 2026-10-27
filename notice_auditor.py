@@ -1,5 +1,5 @@
 """
-Privacy Notice Auditor — rule-based GDPR / ePrivacy transparency scanner.
+Privacy Notice Compliance Center — rule-based GDPR / ePrivacy transparency scanner.
 
 Fetches a privacy notice (auto-discovering it from a site homepage), extracts the
 text, runs ~20 deterministic checks mapped to GDPR Art. 13/14 and ePrivacy Art. 5(3)
@@ -20,7 +20,7 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
-UA = "Mozilla/5.0 (compatible; DDPPrivacyNoticeAuditor/1.0; +https://ddp-workbench.onrender.com)"
+UA = "Mozilla/5.0 (compatible; DDPPrivacyNoticeComplianceCenter/1.0; +https://ddp-workbench.onrender.com)"
 MAX_BYTES = 3_000_000
 TIMEOUT = 25.0
 

@@ -272,7 +272,7 @@ tr:hover td { background: rgba(79,140,255,.04); }
 .qa-a { color: var(--muted); line-height: 1.65; }
 .qa-entry { background: var(--panel); }
 
-/* ---------- Privacy Notice Auditor ---------- */
+/* ---------- Privacy Notice Compliance Center ---------- */
 .aud-form { margin:18px 0 10px; }
 .aud-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .aud-row > input[type=text], .aud-form input:not([type]) {

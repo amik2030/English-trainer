@@ -1,4 +1,4 @@
-"""Portfolio-monitor helpers for the Privacy Notice Auditor.
+"""Portfolio-monitor helpers for the Privacy Notice Compliance Center.
 
 Scores are screening signals only. This module decides which changed checks should
 be offered to a human reviewer; it does not determine legal compliance.
