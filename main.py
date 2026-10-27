@@ -851,7 +851,7 @@ async def set_role(request: Request):
 
 # ---------------- PRIVACY NOTICE AUDITOR ----------------
 from notice_auditor import audit as audit_notice, ALL_CHECKS
-from privacy_monitor import compare_results, result_fingerprint
+from privacy_monitor import compare_results, result_fingerprint, review_detail, event_review_detail
 
 
 class AuditRequest(BaseModel):
@@ -930,6 +930,22 @@ def _monitor_scan_history(monitor_id: int, user_id: str, limit: int = 30) -> lis
             .eq("status", "done").order("created_at", desc=True)
             .limit(limit).execute().data or [])
     return [r.get("result") or {} for r in reversed(rows)]
+
+
+def _enrich_monitor_review_details(rows: list[dict]) -> list[dict]:
+    """Generate concise reviewer summaries for current and legacy queue rows."""
+    scan_ids = list({r.get("scan_id") for r in rows if r.get("scan_id") is not None})
+    scans = (admin.table("notice_scans").select("id, result").in_("id", scan_ids).execute().data or []) if scan_ids else []
+    by_id = {r["id"]: r.get("result") or {} for r in scans}
+    for row in rows:
+        if row.get("kind") in ("initial_finding", "new_finding", "regression", "reopened"):
+            result = by_id.get(row.get("scan_id"), {})
+            check = next((c for c in (result.get("checks") or []) if c.get("id") == row.get("finding_key")), None)
+            if check:
+                row["detail"] = review_detail(check, row["kind"], result)
+        elif row.get("kind") in ("notice_changed", "score_drop", "scan_failed", "notice_hub"):
+            row["detail"] = event_review_detail(row)
+    return rows
 
 
 def _review_is_muted(monitor_id: int, user_id: str, key: str) -> bool:
@@ -1252,6 +1268,7 @@ async def auditor_monitors(request: Request):
         by_monitor.setdefault(scan["monitor_id"], []).append(scan)
     reviews = (admin.table("monitor_reviews").select("*").eq("user_id", prof["id"]).in_("monitor_id", ids)
                .eq("status", "pending").order("created_at", desc=True).limit(500).execute().data or [])
+    reviews = _enrich_monitor_review_details(reviews)
     pending_by_monitor = {}
     for review in reviews:
         pending_by_monitor[review["monitor_id"]] = pending_by_monitor.get(review["monitor_id"], 0) + 1
@@ -1391,6 +1408,9 @@ async def auditor_monitor_reviews(request: Request, status: str = "pending", lim
     if prof.get("role") != "reviewer":
         q = q.eq("user_id", prof["id"])
     rows = q.order("created_at", desc=True).limit(min(max(limit, 1), 500)).execute().data or []
+    # Enrich old queue rows on read as well as writing detailed text on new scans.
+    # This makes the existing pending queue useful immediately without a manual DB migration.
+    rows = _enrich_monitor_review_details(rows)
     return {"reviews": rows}
 
 

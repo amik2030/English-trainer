@@ -1075,7 +1075,18 @@
       <div class="mon-actions"><button class="btn small primary" data-mon-scan="${esc(m.id)}">Scan now</button><button class="btn small" data-mon-toggle="${esc(m.id)}" data-enabled="${m.enabled?"1":"0"}">${m.enabled?"Pause":"Resume"}</button><button class="btn small red" data-mon-delete="${esc(m.id)}">Remove</button></div></article>`;
     }).join(""):'<div class="card muted small">No websites tracked yet. Add one above to start monitoring.</div>';
     const reviews=data.reviews||[];
-    $("#mon-reviews").innerHTML=reviews.length?`<div class="mon-review-list">${reviews.map(r=>{const m=sites.find(x=>String(x.id)===String(r.monitor_id));return `<article class="mon-review"><div class="mon-review-head"><span class="pill ${esc(r.severity)}">${esc(r.severity)}</span><b>${esc(r.title)}</b></div><div class="muted small">${esc(m?.label||"Website")} · ${esc(String(r.kind).replace(/_/g," "))} · ${esc(new Date(r.created_at).toLocaleString())}</div>${r.detail?`<p class="small mon-review-detail">${esc(r.detail)}</p>`:""}<div class="mon-actions"><button class="btn small" data-mon-review="${esc(r.id)}" data-status="in_review">Reviewing</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="resolved">Resolve</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="accepted">Accept risk</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="false_positive">False positive</button></div></article>`}).join("")}</div>`:'<div class="card muted small">✨ Review queue clear — no pending findings.</div>';
+    const reviewDetailHtml = (detail) => {
+      const lines = String(detail || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+      if (!lines.length) return "";
+      const lead = lines.find(x => /^(Potential gap|Possible regression|Possible recurring gap|Possible new gap):/i.test(x));
+      if (!lead) return `<p class="small mon-review-detail">${esc(lines.join(" "))}</p>`;
+      const scope = lines.find(x => /^Scope warning:/i.test(x));
+      const extra = lines.filter(x => x !== lead && x !== scope);
+      return `<div class="mon-review-detail"><p class="mon-review-summary">${esc(lead)}</p>
+        ${scope ? `<p class="mon-review-scope">⚠ ${esc(scope.replace(/^Scope warning:\s*/i, ""))}</p>` : ""}
+        ${extra.length ? `<details class="mon-review-more"><summary>Why it matters · what to verify</summary><div>${extra.map(x => `<p>${esc(x)}</p>`).join("")}</div></details>` : ""}</div>`;
+    };
+    $("#mon-reviews").innerHTML=reviews.length?`<div class="mon-review-list">${reviews.map(r=>{const m=sites.find(x=>String(x.id)===String(r.monitor_id));return `<article class="mon-review"><div class="mon-review-head"><span class="pill ${esc(r.severity)}">${esc(r.severity)}</span><b>${esc(r.title)}</b></div><div class="muted small">${esc(m?.label||"Website")} · ${esc(String(r.kind).replace(/_/g," "))} · ${esc(new Date(r.created_at).toLocaleString())}</div>${reviewDetailHtml(r.detail)}<div class="mon-actions"><button class="btn small" data-mon-review="${esc(r.id)}" data-status="in_review">Reviewing</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="resolved">Resolve</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="accepted">Accept risk</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="false_positive">False positive</button></div></article>`}).join("")}</div>`:'<div class="card muted small">✨ Review queue clear — no pending findings.</div>';
     wireMonitorActions();
   }
 
