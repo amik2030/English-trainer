@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pocket DDP Workbench</title>
 <meta http-equiv="Cache-Control" content="no-store">
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=6">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
@@ -148,6 +148,13 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
       <div class="eyebrow">General consulting</div>
       <h1>Ask the Workbench</h1>
       <p class="lede">Answers are grounded in the reviewer-approved knowledge base. Every answer cites what it relied on.</p>
+
+      <div class="ask-modes" id="ask-modes">
+        <button class="ask-mode active" data-askmode="single">💬 Single question</button>
+        <button class="ask-mode" data-askmode="chat">🧵 Conversation</button>
+        <span class="ask-mode-hint muted small" id="ask-mode-hint">One question, one cited answer.</span>
+      </div>
+
       <div class="ask-bar">
         <input id="ask-input" placeholder="e.g. Do the EDPB legitimate-interest guidelines change our cookie analytics position?" maxlength="800">
         <button class="btn primary" id="ask-btn">Ask</button>
@@ -176,7 +183,22 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
       <p class="scope-active-hint hidden" id="scope-hint"></p>
       <div id="ask-loading" class="hidden card" style="text-align:center"><span class="spin"></span> <span class="muted small">Researching…</span></div>
       <div id="ask-result"></div>
-      <div class="section-head"><h2>💬 Your recent questions</h2></div>
+
+      <!-- conversation mode -->
+      <div id="chat-pane" class="hidden">
+        <div class="chat-head">
+          <div>
+            <div class="chat-title" id="chat-title">New conversation</div>
+            <div class="muted small" id="chat-sub">Follow-ups keep the thread — ask, then dig deeper.</div>
+          </div>
+          <button class="btn small primary" id="chat-new-btn">＋ New conversation</button>
+        </div>
+        <div id="chat-thread" class="chat-thread"></div>
+        <div id="chat-loading" class="hidden card" style="text-align:center"><span class="spin"></span> <span class="muted small">Thinking…</span></div>
+        <div id="chat-followups" class="chat-followups"></div>
+      </div>
+
+      <div class="section-head"><h2 id="history-heading">💬 Your recent questions</h2></div>
       <div id="history"></div>
     </section>
 
@@ -329,6 +351,6 @@ textarea.rv { width:100%; min-height:70px; padding:10px 12px; border-radius:9px;
   </main>
 </div>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

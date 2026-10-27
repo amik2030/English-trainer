@@ -22,6 +22,7 @@ from openai import OpenAI
 from supabase import create_client
 import os
 import json
+import re
 import httpx
 from datetime import datetime, timezone
 from pathlib import Path
@@ -196,6 +197,16 @@ class AskRequest(BaseModel):
     scope: Optional[AskScope] = None
 
 
+class ThreadCreate(BaseModel):
+    title: Optional[str] = None
+    scope: Optional[AskScope] = None
+
+
+class ThreadChatRequest(BaseModel):
+    message: str
+    scope: Optional[AskScope] = None
+
+
 def _source_in_scope(s: dict, sc: Optional[AskScope]) -> bool:
     if sc is None:
         return True
@@ -309,7 +320,7 @@ async def ask(req: AskRequest, request: Request, background_tasks: BackgroundTas
         ins = admin.table("qa_history").insert({
             "user_id": prof["id"], "question": q, "answer": answer,
             "citations": cits, "kb_reused": False, "status": "answered",
-            "answered_at": _now(),
+            "answered_at": _now(), "source": "ask",
         }).execute()
         row_id = ins.data[0]["id"] if ins.data else None
         # gap flag: KB didn't cover it or low confidence
@@ -350,8 +361,225 @@ def tag_qa(qa_id: int, question: str, answer: str):
 async def history(request: Request, limit: int = 20):
     prof = await current_user(request)
     rows = admin.table("qa_history").select("*").eq("user_id", prof["id"]) \
-        .eq("status", "answered").order("answered_at", desc=True).limit(min(limit, 50)).execute().data or []
+        .eq("status", "answered").eq("source", "ask") \
+        .order("answered_at", desc=True).limit(min(limit, 50)).execute().data or []
     return {"count": len(rows), "entries": rows}
+
+
+# ---------------- CONVERSATIONAL ASK ----------------
+
+CHAT_SYSTEM = """You are the AI research assistant of a private Legal Research Workbench used by data-protection and employment lawyers, now in CONVERSATION mode.
+You answer questions about data protection, privacy, AI governance, employment law and compliance (GDPR, AI Act, FADP, Digital Omnibus, ePrivacy, Schrems II, transfers, breaches, employment contracts, working time, dismissal, employee monitoring, collective bargaining, occupational health & safety, cross-border posting, etc.).
+
+You receive: (1) the CONVERSATION SO FAR, (2) the user's NEW MESSAGE, (3) APPROVED KNOWLEDGE ITEMS (curated by the human reviewer), (4) APPROVED SOURCES register.
+
+Procedure:
+1. Treat the conversation as one continuous discussion. Resolve pronouns and follow-ups ("and for Switzerland?", "what about the retention side?") against the earlier turns. Never re-introduce yourself or repeat the prior answer.
+2. Compose a direct answer GROUNDED IN the approved knowledge items and sources where they cover the topic; supplement with your own legal knowledge only where the KB is silent. Lead with the answer, then 2-4 supporting points. 100-250 words unless the user asks for depth.
+3. Cite instruments/articles exactly (e.g. Art. 6(1)(f) GDPR) and approved source titles exactly.
+4. If the user asks something genuinely unrelated to law/compliance, say so briefly and offer the nearest relevant angle.
+5. Never fabricate case law or dates; flag uncertainty briefly.
+
+Respond with ONLY a JSON object:
+{"answer": str, "followups": [str], "citations": [{"kind": "knowledge_item"|"source", "id": int, "title": str}], "kb_grounded": bool, "confidence": float, "jurisdiction": str, "title": str}
+- followups: 2-3 short suggested next questions, or [].
+- title: a 2-5 word title for this conversation, derived from the discussion as a whole (used for labelling only)."""
+
+
+def _kb_context(sc: Optional[AskScope], qa_limit: int = 40):
+    """Approved KB + sources (+ prior Q&A) filtered by the active scope."""
+    ki_all = admin.table("knowledge_items").select("id, content, source_id, taxonomy_ids, tags") \
+        .eq("status", "approved").order("reviewed_at", desc=True).limit(60).execute().data or []
+    src_all = admin.table("sources").select("id, title, taxonomy_ids, tags, instrument, jurisdiction, classification") \
+        .eq("status", "approved").order("reviewed_at", desc=True).limit(40).execute().data or []
+    src = [x for x in src_all if _source_in_scope(x, sc)]
+    if sc is not None:
+        in_src_ids = {x["id"] for x in src}
+        pref = (sc.taxonomy_area or "").strip().upper()
+        ki = [k for k in ki_all
+              if k.get("source_id") in in_src_ids
+              or (pref and any(str(i).upper() == pref or str(i).upper().startswith(pref + ".")
+                               for i in (k.get("taxonomy_ids") or [])))]
+    else:
+        ki = ki_all
+    qa = admin.table("qa_history").select("id, question, answer").eq("status", "answered") \
+        .order("answered_at", desc=True).limit(qa_limit).execute().data or []
+    return ki, src, qa
+
+
+def _thread_owned(thread_id: int, prof: dict) -> dict:
+    rows = admin.table("chat_threads").select("*").eq("id", thread_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "conversation not found")
+    if rows[0]["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your conversation")
+    return rows[0]
+
+
+def _thread_messages(thread_id: int, limit: int = 40) -> list[dict]:
+    rows = admin.table("chat_messages").select("*").eq("thread_id", thread_id) \
+        .order("created_at", desc=True).limit(min(limit, 60)).execute().data or []
+    return list(reversed(rows))
+
+
+@app.get("/api/threads")
+async def list_threads(request: Request, limit: int = 30):
+    prof = await current_user(request)
+    rows = admin.table("chat_threads").select("id, title, message_count, last_message_at, created_at, scope") \
+        .eq("user_id", prof["id"]).order("last_message_at", desc=True).limit(min(limit, 100)).execute().data or []
+    return {"count": len(rows), "threads": rows}
+
+
+@app.post("/api/threads")
+async def create_thread(req: ThreadCreate, request: Request):
+    prof = await current_user(request)
+    row = admin.table("chat_threads").insert({
+        "user_id": prof["id"],
+        "title": (req.title or "").strip()[:80] or "New conversation",
+        "scope": (req.scope.model_dump(exclude_none=True) if req.scope else {}),
+        "message_count": 0,
+        "last_message_at": _now(),
+        "updated_at": _now(),
+    }).execute().data[0]
+    return {"thread": row}
+
+
+@app.get("/api/threads/{thread_id}")
+async def get_thread(thread_id: int, request: Request):
+    prof = await current_user(request)
+    thread = _thread_owned(thread_id, prof)
+    return {"thread": thread, "messages": _thread_messages(thread_id)}
+
+
+@app.patch("/api/threads/{thread_id}")
+async def rename_thread(thread_id: int, request: Request):
+    prof = await current_user(request)
+    _thread_owned(thread_id, prof)
+    body = await request.json()
+    title = str(body.get("title") or "").strip()[:80]
+    if not title:
+        raise HTTPException(400, "title required")
+    out = admin.table("chat_threads").update({"title": title, "updated_at": _now()}) \
+        .eq("id", thread_id).execute().data
+    return {"thread": (out or [])[0]}
+
+
+@app.delete("/api/threads/{thread_id}")
+async def delete_thread(thread_id: int, request: Request):
+    prof = await current_user(request)
+    _thread_owned(thread_id, prof)
+    admin.table("chat_threads").delete().eq("id", thread_id).execute()
+    return {"ok": True}
+
+
+@app.post("/api/threads/{thread_id}/message")
+async def thread_message(thread_id: int, req: ThreadChatRequest, request: Request, background_tasks: BackgroundTasks):
+    prof = await current_user(request)
+    thread = _thread_owned(thread_id, prof)
+    if thread["user_id"] != prof["id"]:
+        raise HTTPException(403, "only the owner can post in this conversation")
+    msg = (req.message or "").strip()[:1500]
+    if not msg:
+        raise HTTPException(400, "message required")
+
+    if req.scope is not None:
+        sc = req.scope
+    elif thread.get("scope"):
+        sc = AskScope(**{k: v for k, v in (thread["scope"] or {}).items() if v})
+    else:
+        sc = None
+    history_rows = _thread_messages(thread_id, limit=24)
+    ki, src, _qa = _kb_context(sc)
+
+    convo = [{"role": r["role"], "content": r["content"][:1500]} for r in history_rows][-16:]
+    prompt = (
+        (("\n" + _scope_summary(sc) + "\n\n") if _scope_summary(sc) else "")
+        + "CONVERSATION SO FAR:\n" + (json.dumps(convo, ensure_ascii=False) if convo else "[] (this is the first turn)")
+        + "\n\nNEW MESSAGE:\n" + msg
+        + "\n\nAPPROVED KNOWLEDGE ITEMS:\n" + json.dumps(
+            [{"id": k["id"], "content": k["content"][:800], "taxonomy_ids": k.get("taxonomy_ids") or [],
+              "source_id": k.get("source_id")} for k in ki], ensure_ascii=False)
+        + "\n\nAPPROVED SOURCES:\n" + json.dumps([{"id": x["id"], "title": x["title"]} for x in src], ensure_ascii=False)
+    )
+    try:
+        out = _llm_json(CHAT_SYSTEM, prompt, max_tokens=900)
+    except Exception as e:
+        raise HTTPException(502, f"answer generation failed: {e}")
+    answer = str(out.get("answer", "")).strip()
+    if not answer:
+        raise HTTPException(502, "empty answer")
+
+    ki_ids = {k["id"] for k in ki}
+    src_ids = {x["id"] for x in src}
+    cits = []
+    for c in (out.get("citations") or [])[:8]:
+        kind, cid = c.get("kind"), c.get("id")
+        if kind == "knowledge_item" and cid in ki_ids:
+            cits.append({"kind": "knowledge_item", "id": cid,
+                         "title": ([k for k in ki if k["id"] == cid][0].get("content") or "")[:80]})
+        elif kind == "source" and cid in src_ids:
+            cits.append({"kind": "source", "id": cid, "title": [x for x in src if x["id"] == cid][0]["title"]})
+
+    try:
+        conf = max(0.0, min(1.0, float(out.get("confidence", 0.8))))
+    except (TypeError, ValueError):
+        conf = 0.8
+    jur = str(out.get("jurisdiction", "INTL"))[:10] or "INTL"
+    followups = [str(x)[:160] for x in (out.get("followups") or [])[:3]]
+
+    admin.table("chat_messages").insert({
+        "thread_id": thread_id, "user_id": prof["id"], "role": "user", "content": msg,
+    }).execute()
+
+    # Mirror each turn into qa_history so KB coverage analysis and gap flags keep working.
+    qa_ins = admin.table("qa_history").insert({
+        "user_id": prof["id"], "question": msg, "answer": answer,
+        "citations": cits, "kb_reused": False, "status": "answered",
+        "answered_at": _now(), "source": "chat",
+    }).execute()
+    qa_id = (qa_ins.data or [{}])[0].get("id")
+
+    asst = admin.table("chat_messages").insert({
+        "thread_id": thread_id, "user_id": prof["id"], "role": "assistant", "content": answer,
+        "citations": cits, "kb_grounded": bool(out.get("kb_grounded")),
+        "confidence": conf, "jurisdiction": jur, "qa_id": qa_id,
+    }).execute().data[0]
+
+    if (not out.get("kb_grounded")) or conf < 0.55:
+        try:
+            admin.table("gap_flags").insert({
+                "qa_id": qa_id, "question": msg,
+                "reason": "low confidence" if conf < 0.55 else "not covered by approved KB",
+            }).execute()
+        except Exception:
+            pass
+    if qa_id is not None:
+        background_tasks.add_task(tag_qa, qa_id, msg, answer)
+
+    # Title the conversation from its content once, and only while it is still generic.
+    new_title = None
+    generic = (thread.get("title") or "").strip().lower() in ("", "new conversation", "untitled")
+    suggested = str(out.get("title") or "").strip()[:80]
+    if generic and suggested:
+        candidates = [suggested, msg[:60].strip()]
+        for cand in candidates:
+            cand = re.sub(r"\s+", " ", cand).strip(" .?!,;:-")
+            if 3 <= len(cand) <= 60:
+                new_title = cand[0].upper() + cand[1:]
+                break
+
+    update = {"last_message_at": _now(), "updated_at": _now(),
+              "message_count": int(thread.get("message_count") or 0) + 2}
+    if new_title:
+        update["title"] = new_title
+    if req.scope is not None:
+        update["scope"] = req.scope.model_dump(exclude_none=True)
+    admin.table("chat_threads").update(update).eq("id", thread_id).execute()
+
+    return {"message": asst, "thread_id": thread_id, "title": new_title or thread["title"],
+            "followups": followups, "answer": answer, "citations": cits,
+            "confidence": conf, "jurisdiction": jur,
+            "kb_counts": {"sources_in_scope": len(src), "items_in_scope": len(ki)}}
 
 
 # ---------------- Knowledge Base (approved items, taxonomy-grouped) ----------------

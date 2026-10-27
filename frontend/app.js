@@ -105,6 +105,7 @@
       if (id === "kb") loadKB();
       if (id === "review") loadQueue();
       if (id === "auditor") { loadAudits(); loadMonitors(); }
+      if (id === "ask") { if (ASK_MODE === "chat") loadThreads(); else loadHistory(); }
     }));
     $$(".tab").forEach((t) => t.addEventListener("click", () => {
       $$(".tab").forEach((x) => x.classList.remove("active"));
@@ -139,6 +140,7 @@
   $("#ask-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") doAsk(); });
 
   async function doAsk() {
+    if (ASK_MODE === "chat") return sendChat();
     const q = $("#ask-input").value.trim();
     if (!q) return;
     $("#ask-input").value = "";
@@ -157,6 +159,156 @@
     $("#ask-loading").classList.add("hidden");
     $("#ask-btn").disabled = false; $("#ask-btn").textContent = "Ask";
   }
+
+  // ---------- ASK MODES ----------
+  const ASKMODE_HINTS = {
+    single: "One question, one cited answer.",
+    chat: "Multi-turn thread — follow-ups keep the context. Each conversation is titled and saved.",
+  };
+  let ASK_MODE = "single";
+  let CHAT_THREAD_ID = null;
+
+  function setAskMode(mode) {
+    ASK_MODE = mode === "chat" ? "chat" : "single";
+    $$(".ask-mode").forEach((b) => b.classList.toggle("active", b.dataset.askmode === ASK_MODE));
+    const hint = $("#ask-mode-hint");
+    if (hint) hint.textContent = ASKMODE_HINTS[ASK_MODE];
+    $("#ask-form-wrap")?.classList.remove("hidden");
+    $("#chat-pane")?.classList.toggle("hidden", ASK_MODE !== "chat");
+    $("#history-heading").textContent = ASK_MODE === "chat" ? "🗂 Your conversations" : "💬 Your recent questions";
+    $("#ask-input").placeholder = ASK_MODE === "chat"
+      ? "Ask anything — then follow up in the same thread…"
+      : "e.g. Do the EDPB legitimate-interest guidelines change our cookie analytics position?";
+    $("#ask-btn").textContent = ASK_MODE === "chat" ? "Send" : "Ask";
+    if (ASK_MODE === "chat") { loadThreads(); } else { loadHistory(); }
+  }
+
+  $$(".ask-mode").forEach((b) => b.addEventListener("click", () => setAskMode(b.dataset.askmode)));
+
+  // ---------- CONVERSATIONS ----------
+  function chatMsgHtml(m) {
+    const isUser = m.role === "user";
+    const cits = (m.citations || []).map((c) =>
+      `<span class="cit">↳ <b>${esc(c.kind === "source" ? "source" : "knowledge")}</b>: ${esc(c.title)}</span>`).join("<br>");
+    const meta = isUser ? "" : `<div class="chat-meta">
+        <span class="badge">confidence ${Math.round((m.confidence ?? 0) * 100) / 100}</span>
+        <span class="badge">${esc(m.jurisdiction || "INTL")}</span>
+        ${m.kb_grounded ? '<span class="badge green">KB-grounded</span>' : '<span class="badge amber">KB silent</span>'}
+      </div>${cits ? `<div style="margin-top:8px">${cits}</div>` : ""}`;
+    return `<div class="chat-msg ${isUser ? "user" : "assistant"}">
+      <div class="av">${isUser ? "🙋" : "§"}</div>
+      <div class="chat-bub">${esc(m.content)}${meta}</div>
+    </div>`;
+  }
+
+  function renderThread(thread, messages) {
+    const box = $("#chat-thread");
+    $("#chat-title").textContent = (thread && thread.title) || "New conversation";
+    $("#chat-sub").textContent = messages?.length
+      ? `${messages.length} message${messages.length === 1 ? "" : "s"} · follow up below to keep the thread going`
+      : "Follow-ups keep the thread — ask, then dig deeper.";
+    box.innerHTML = messages?.length
+      ? messages.map(chatMsgHtml).join("")
+      : '<div class="card muted small">Start the conversation — ask your first question below.</div>';
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function openThread(id) {
+    CHAT_THREAD_ID = id;
+    try {
+      const r = await api("/api/threads/" + id);
+      renderThread(r.thread, r.messages);
+      $("#chat-followups").innerHTML = "";
+      loadThreads();
+    } catch (e) { toast("❌ " + e.message); }
+  }
+
+  function newConversation() {
+    CHAT_THREAD_ID = null;
+    $("#chat-title").textContent = "New conversation";
+    renderThread(null, []);
+    $("#chat-followups").innerHTML = "";
+    $("#chat-thread").innerHTML = '<div class="card muted small">Start the conversation — ask your first question below.</div>';
+    $("#ask-input")?.focus();
+    loadThreads();
+  }
+
+  async function loadThreads() {
+    const el = $("#history");
+    if (!el) return;
+    try {
+      const r = await api("/api/threads?limit=30");
+      if (!r.threads.length) {
+        el.innerHTML = '<p class="muted small">No conversations yet. Ask something to start the first one.</p>';
+        return;
+      }
+      el.innerHTML = r.threads.map((t) => `
+        <div class="thread-item ${String(t.id) === String(CHAT_THREAD_ID) ? "active" : ""}" data-thread="${t.id}">
+          <div class="thread-main">
+            <div class="thread-name">🧵 ${esc(t.title || "Untitled")}</div>
+            <div class="thread-sub">${esc(t.message_count || 0)} msg · ${new Date(t.last_message_at).toLocaleString()}</div>
+          </div>
+          <button class="thread-del" data-thread-del="${t.id}" title="Delete conversation">🗑</button>
+        </div>`).join("");
+      $$('#history [data-thread]').forEach((d) => d.addEventListener("click", (e) => {
+        if (e.target.closest("[data-thread-del]")) return;
+        openThread(d.dataset.thread);
+      }));
+      $$('#history [data-thread-del]').forEach((b) => b.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm("Delete this conversation and its messages?")) return;
+        b.disabled = true;
+        try {
+          await api("/api/threads/" + b.dataset.threadDel, { method: "DELETE" });
+          if (String(CHAT_THREAD_ID) === String(b.dataset.threadDel)) newConversation();
+          else loadThreads();
+          toast("🗑 Conversation deleted");
+        } catch (err) { toast("❌ " + err.message); b.disabled = false; }
+      }));
+    } catch (e) { el.innerHTML = `<p class="muted small">${esc(e.message)}</p>`; }
+  }
+
+  async function sendChat() {
+    const input = $("#ask-input");
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = "";
+    $("#ask-btn").disabled = true; $("#ask-btn").textContent = "Thinking…";
+    $("#chat-loading").classList.remove("hidden");
+    const box = $("#chat-thread");
+    if (!box.querySelector(".chat-msg")) box.innerHTML = "";
+    box.insertAdjacentHTML("beforeend", chatMsgHtml({ role: "user", content: msg }));
+    box.scrollTop = box.scrollHeight;
+    try {
+      const sc = currentScope();
+      if (!CHAT_THREAD_ID) {
+        const created = await api("/api/threads", { method: "POST", body: { scope: sc } });
+        CHAT_THREAD_ID = created.thread.id;
+      }
+      const out = await api("/api/threads/" + CHAT_THREAD_ID + "/message", {
+        method: "POST", body: { message: msg, scope: sc },
+      });
+      box.insertAdjacentHTML("beforeend", chatMsgHtml(out.message));
+      box.scrollTop = box.scrollHeight;
+      $("#chat-title").textContent = out.title || "Conversation";
+      $("#chat-followups").innerHTML = (out.followups || []).length
+        ? out.followups.map((f) => `<button data-followup="${esc(f)}">💡 ${esc(f)}</button>`).join("")
+        : "";
+      $$("#chat-followups [data-followup]").forEach((b) => b.addEventListener("click", () => {
+        input.value = b.dataset.followup;
+        sendChat();
+      }));
+      loadThreads();
+      if (ME.role === "reviewer") loadQueue();
+    } catch (e) {
+      box.insertAdjacentHTML("beforeend",
+        `<div class="card" style="color:var(--red)">❌ ${esc(e.message)}</div>`);
+    }
+    $("#chat-loading").classList.add("hidden");
+    $("#ask-btn").disabled = false; $("#ask-btn").textContent = "Send";
+  }
+
+  $("#chat-new-btn")?.addEventListener("click", newConversation);
 
   async function loadHistory() {
     try {
