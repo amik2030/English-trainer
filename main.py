@@ -933,13 +933,18 @@ def _monitor_scan_history(monitor_id: int, user_id: str, limit: int = 30) -> lis
 
 
 def _enrich_monitor_review_details(rows: list[dict]) -> list[dict]:
-    """Generate concise reviewer summaries for current and legacy queue rows."""
-    scan_ids = list({r.get("scan_id") for r in rows if r.get("scan_id") is not None})
-    scans = (admin.table("notice_scans").select("id, result").in_("id", scan_ids).execute().data or []) if scan_ids else []
-    by_id = {r["id"]: r.get("result") or {} for r in scans}
+    """Generate concise reviewer summaries from each monitor's latest scan."""
+    monitor_ids = list({r.get("monitor_id") for r in rows if r.get("monitor_id") is not None})
+    scans = (admin.table("notice_scans").select("id, monitor_id, result")
+             .in_("monitor_id", monitor_ids).eq("status", "done")
+             .order("created_at", desc=True).limit(min(1000, len(monitor_ids) * 30))
+             .execute().data or []) if monitor_ids else []
+    latest_by_monitor = {}
+    for scan in scans:  # desc order: first entry is the latest per monitor
+        latest_by_monitor.setdefault(scan["monitor_id"], scan.get("result") or {})
     for row in rows:
         if row.get("kind") in ("initial_finding", "new_finding", "regression", "reopened"):
-            result = by_id.get(row.get("scan_id"), {})
+            result = latest_by_monitor.get(row.get("monitor_id"), {})
             check = next((c for c in (result.get("checks") or []) if c.get("id") == row.get("finding_key")), None)
             if check:
                 row["detail"] = review_detail(check, row["kind"], result)
