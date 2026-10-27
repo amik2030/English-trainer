@@ -180,7 +180,12 @@
       ? "Ask anything — then follow up in the same thread…"
       : "e.g. Do the EDPB legitimate-interest guidelines change our cookie analytics position?";
     $("#ask-btn").textContent = ASK_MODE === "chat" ? "Send" : "Ask";
-    if (ASK_MODE === "chat") { loadThreads(); } else { loadHistory(); }
+    if (ASK_MODE === "chat") {
+      // Never show an empty pane: either resume the open thread or start fresh.
+      const box = $("#chat-thread");
+      if (!box.innerHTML.trim() || !box.querySelector(".chat-msg, .card")) newConversation();
+      else loadThreads();
+    } else { loadHistory(); }
   }
 
   $$(".ask-mode").forEach((b) => b.addEventListener("click", () => setAskMode(b.dataset.askmode)));
