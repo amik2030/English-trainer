@@ -144,6 +144,16 @@ def review_detail(check: dict[str, Any] | None, kind: str = "initial_finding",
                   result: dict[str, Any] | None = None) -> str:
     """Build a concise, qualified summary for the human review queue."""
     check = check or {}
+    if check.get("passed"):
+        evidence = re.sub(r"\s+", " ", str(check.get("evidence") or "")).strip()
+        lines = [
+            "Update: the latest scan now detects wording for this checklist item; the earlier finding was not reproduced.",
+            "Verify: confirm the wording is adequate and applies to the same processing. If so, resolve the older review item; if not, inspect the notice and scanner evidence.",
+        ]
+        if evidence:
+            lines.append(f"Latest text signal: “{evidence[:240]}”")
+        lines.append("The scan is a text-pattern signal, not a legal determination.")
+        return "\n".join(lines)
     key = str(check.get("id") or "")
     summary, why, verify = REVIEW_EXPLANATIONS.get(key, (
         "The automated checklist did not detect expected wording for this item.",
