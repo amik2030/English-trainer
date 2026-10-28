@@ -59,6 +59,30 @@
 
   function showLogin() { location.replace("/login.html"); }
 
+  function wireThemeToggle() {
+    const toggle = $("#theme-toggle");
+    if (!toggle) return;
+    const applyTheme = (theme, persist) => {
+      const selected = theme === "light" ? "light" : "dark";
+      const target = selected === "light" ? "dark" : "light";
+      document.documentElement.dataset.theme = selected;
+      toggle.setAttribute("aria-pressed", String(selected === "light"));
+      toggle.setAttribute("aria-label", `Switch to ${target} mode`);
+      toggle.title = `Switch to ${target} mode`;
+      $("#theme-toggle-label").textContent = `${target[0].toUpperCase()}${target.slice(1)} mode`;
+      $("#theme-toggle-icon").textContent = target === "light" ? "☀️" : "🌙";
+      if (persist) {
+        try { localStorage.setItem("ddp-workbench-theme", selected); } catch (e) {}
+      }
+    };
+    let saved = "dark";
+    try { saved = localStorage.getItem("ddp-workbench-theme") === "light" ? "light" : "dark"; } catch (e) {}
+    applyTheme(saved, false);
+    toggle.addEventListener("click", () => {
+      applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light", true);
+    });
+  }
+
   async function enterApp() {
     try {
       try { ME = await api("/api/me"); }
@@ -1114,5 +1138,6 @@
   $("#aud-btn")?.addEventListener("click", runAudit);
   $("#aud-url")?.addEventListener("keydown", (e) => { if (e.key === "Enter") runAudit(); });
 
+  wireThemeToggle();
   boot().catch((e) => { console.error(e); showLogin(); });
 })();
