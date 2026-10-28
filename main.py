@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):
         pass
 
 
-app = FastAPI(title="Pocket DDP Workbench", lifespan=lifespan)
+app = FastAPI(title="Legal Research Workbench", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
