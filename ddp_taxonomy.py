@@ -64,6 +64,12 @@ TAXONOMY_NODES = {
     "C.1": "Records management & retention",
     "C.2": "Classification & safeguarding",
     "C.3": "eDiscovery & legal hold",
+    "C.3.1": "Cross-border discovery & blocking statutes",
+    "C.3.2": "Legal hold & preservation (trigger, scope, release)",
+    "C.3.3": "Collection, processing & review (search, TAR, GenAI)",
+    "C.3.4": "Privilege, disclosure & production",
+    "C.3.5": "Spoliation, sanctions & defensibility",
+    "C.3.6": "Defensible disposition & matter closure",
     "C.4": "Archives & long-term preservation",
     "C.5": "Data quality & lifecycle",
     # D — Employment Law (added 2026-10-08 per Amik request)
@@ -90,13 +96,16 @@ TAXONOMY_TAGS = [
     "internal-investigation", "pharma-research", "clinical-trials", "RWD",
     "pharmacovigilance", "cybersecurity", "incident-response",
     "case-law",
+    "e-discovery", "legal-hold", "cross-border-discovery", "blocking-statute",
+    "proportionality", "technology-assisted-review", "privilege",
+    "data-subject-rights-request",
 ]
 
 # Orthogonal axes
 INSTRUMENT_TYPES = [
     "REGULATION", "DIRECTIVE", "DECISION", "JUDGMENT", "DPA_DECISION",
     "OPINION", "GUIDELINES", "POLICY", "SOP", "STANDARD",
-    "CONTRACT_CLAUSE", "COMMENTARY",
+    "CONTRACT_CLAUSE", "COMMENTARY", "CONVENTION", "STATUTE",
 ]
 
 JURISDICTIONS = [

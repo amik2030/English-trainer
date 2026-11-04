@@ -370,6 +370,13 @@
     ["B.2", "B.2 · DSA"],
     ["B.5", "B.5 · NIS2 & Cyber"],
     ["C", "C · Information Governance"],
+    ["C.3", "C.3 · eDiscovery & legal hold"],
+    ["C.3.1", "C.3.1 · Cross-border discovery"],
+    ["C.3.2", "C.3.2 · Legal hold & preservation"],
+    ["C.3.3", "C.3.3 · Collection, processing & review"],
+    ["C.3.4", "C.3.4 · Privilege & production"],
+    ["C.3.5", "C.3.5 · Spoliation & defensibility"],
+    ["C.3.6", "C.3.6 · Disposition & closure"],
     ["D", "D · Employment Law"],
     ["D.4", "D.4 · Employment data & monitoring"],
   ];
