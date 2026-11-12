@@ -1092,8 +1092,12 @@
     const vals = points.map(x => Number(x.scores.overall_pct));
     const min = Math.min(...vals, 0), max = Math.max(...vals, 100), span = Math.max(max - min, 10), w=240, h=34;
     const xy = vals.map((v,i) => `${(i/(vals.length-1))*w},${h-((v-min)/span)*h}`).join(" ");
-    const color = vals.at(-1) >= vals[0] ? "#3fb950" : "#f85149";
-    return `<svg viewBox="0 0 ${w} ${h}" class="mon-spark" preserveAspectRatio="none"><polyline points="${xy}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    // Colour by the latest grade, not by direction: an F trending up is still an F.
+    const last = points.at(-1);
+    const grade = String((last.scores || {}).overall_grade || "").toUpperCase();
+    const color = { A: "#3fb950", B: "#4f8cff", C: "#d29922", D: "#fb923c", F: "#f85149" }[grade] || "#8b96b8";
+    const pct = vals.at(-1);
+    return `<svg viewBox="0 0 ${w} ${h}" class="mon-spark" preserveAspectRatio="none" role="img" aria-label="Score trend, latest ${pct}% (grade ${grade || 'n/a'})"><polyline points="${xy}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
   }
 
   function renderMonitors(data) {

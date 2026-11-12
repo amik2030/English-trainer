@@ -1279,6 +1279,14 @@ async def auditor_monitors(request: Request):
         pending_by_monitor[review["monitor_id"]] = pending_by_monitor.get(review["monitor_id"], 0) + 1
     for m in monitors:
         history = by_monitor.get(m["id"], [])
+        if m.get("notice_url"):
+            # Trend must only reflect scans of the pinned notice. A monitor whose notice_url
+            # was repointed (or was created before the right page was found) keeps seed scans
+            # of a *different* URL — those phantom baselines bend the sparkline and skew KPIs.
+            # Scan rows store the percent-encoded URL, so normalise both sides before comparing.
+            from urllib.parse import unquote
+            pinned = unquote(m["notice_url"]).rstrip("/").lower()
+            history = [s for s in history if unquote(s.get("notice_url") or "").rstrip("/").lower() == pinned]
         m["history"] = list(reversed(history[:30]))
         m["pending_reviews"] = pending_by_monitor.get(m["id"], 0)
         m["latest_scan"] = history[0] if history else None
