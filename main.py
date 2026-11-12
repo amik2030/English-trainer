@@ -433,6 +433,37 @@ async def list_threads(request: Request, limit: int = 30):
     prof = await current_user(request)
     rows = admin.table("chat_threads").select("id, title, message_count, last_message_at, created_at, scope") \
         .eq("user_id", prof["id"]).order("last_message_at", desc=True).limit(min(limit, 100)).execute().data or []
+    if not rows:
+        return {"count": 0, "threads": []}
+
+    # One bounded query for previews instead of an N+1 per thread. Collapsed rows show a
+    # brief summary, so each thread needs its opening question and most recent turn.
+    ids = [r["id"] for r in rows]
+    msgs = (admin.table("chat_messages").select("thread_id, role, content, created_at")
+            .in_("thread_id", ids).order("created_at", desc=True)
+            .limit(min(2000, len(ids) * 40)).execute().data or [])
+
+    def _clean(text: str, n: int = 160) -> str:
+        flat = re.sub(r"\s+", " ", str(text or "")).strip()
+        return flat[:n] + ("…" if len(flat) > n else "")
+
+    per_thread: dict = {}
+    for m in msgs:                      # desc order → first seen is the latest
+        entry = per_thread.setdefault(m["thread_id"], {"latest": m})
+        entry["opening"] = m             # keeps overwriting → ends on the oldest
+
+    for row in rows:
+        entry = per_thread.get(row["id"]) or {}
+        opening = entry.get("opening") or {}
+        latest = entry.get("latest") or {}
+        # Prefer the user's opening question as the summary; fall back to the assistant reply.
+        summary_src = opening.get("content") if opening.get("role") == "user" else None
+        if not summary_src:
+            summary_src = latest.get("content") if latest.get("role") == "user" else ""
+        row["summary"] = _clean(summary_src or "")
+        row["last_role"] = latest.get("role")
+        row["last_excerpt"] = _clean(latest.get("content") or "", 200)
+        row["has_more"] = (row.get("message_count") or 0) > 2
     return {"count": len(rows), "threads": rows}
 
 

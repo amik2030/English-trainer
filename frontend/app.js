@@ -295,6 +295,42 @@
     loadThreads();
   }
 
+  function relTime(iso) {
+    const then = new Date(iso).getTime();
+    if (!Number.isFinite(then)) return "";
+    const mins = Math.round((Date.now() - then) / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const h = Math.round(mins / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.round(h / 24);
+    if (d === 1) return "yesterday";
+    if (d < 7) return `${d}d ago`;
+    return new Date(iso).toLocaleDateString();
+  }
+
+  function threadItem(t) {
+    const active = String(t.id) === String(CHAT_THREAD_ID);
+    const msgs = Number(t.message_count || 0);
+    const summary = (t.summary || "").trim();
+    const more = t.has_more && (t.last_excerpt || "");
+    return `<div class="thread-item ${active ? "active" : ""}" data-thread="${t.id}">
+      <div class="thread-row">
+        <span class="thread-caret" data-thread-toggle="${t.id}" title="${more ? "Show last activity" : "No extra turns"}"${more ? "" : ' aria-disabled="true"'}>${more ? "▸" : "·"}</span>
+        <div class="thread-main">
+          <div class="thread-name">${esc(t.title || "Untitled")}</div>
+          <div class="thread-sub">${msgs} message${msgs === 1 ? "" : "s"} · ${esc(relTime(t.last_message_at))}</div>
+        </div>
+        <button class="thread-del" data-thread-del="${t.id}" title="Delete conversation">🗑</button>
+      </div>
+      ${summary ? `<div class="thread-summary">${esc(summary)}</div>` : ""}
+      ${more ? `<div class="thread-more hidden" data-thread-more="${t.id}">
+        <span class="thread-more-role">${t.last_role === "assistant" ? "Last answer" : "Last question"}</span>
+        <span>${esc(t.last_excerpt)}</span>
+      </div>` : ""}
+    </div>`;
+  }
+
   async function loadThreads() {
     const el = $("#history");
     if (!el) return;
@@ -304,16 +340,20 @@
         el.innerHTML = '<p class="muted small">No conversations yet. Ask something to start the first one.</p>';
         return;
       }
-      el.innerHTML = r.threads.map((t) => `
-        <div class="thread-item ${String(t.id) === String(CHAT_THREAD_ID) ? "active" : ""}" data-thread="${t.id}">
-          <div class="thread-main">
-            <div class="thread-name">🧵 ${esc(t.title || "Untitled")}</div>
-            <div class="thread-sub">${esc(t.message_count || 0)} msg · ${new Date(t.last_message_at).toLocaleString()}</div>
-          </div>
-          <button class="thread-del" data-thread-del="${t.id}" title="Delete conversation">🗑</button>
-        </div>`).join("");
+      el.innerHTML = r.threads.map(threadItem).join("");
+
+      // Caret expands the last turn in place, without opening the thread.
+      $$('#history [data-thread-toggle]').forEach((c) => c.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (c.getAttribute("aria-disabled") === "true") return;
+        const more = el.querySelector(`[data-thread-more="${c.dataset.threadToggle}"]`);
+        if (!more) return;
+        const open = !more.classList.toggle("hidden");
+        c.textContent = open ? "▾" : "▸";
+      }));
+
       $$('#history [data-thread]').forEach((d) => d.addEventListener("click", (e) => {
-        if (e.target.closest("[data-thread-del]")) return;
+        if (e.target.closest("[data-thread-del], [data-thread-toggle]")) return;
         openThread(d.dataset.thread);
       }));
       $$('#history [data-thread-del]').forEach((b) => b.addEventListener("click", async (e) => {
