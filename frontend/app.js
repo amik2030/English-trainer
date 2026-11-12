@@ -228,7 +228,7 @@
 
   function setAskMode(mode) {
     ASK_MODE = mode === "chat" ? "chat" : "single";
-    $$(".ask-mode").forEach((b) => b.classList.toggle("active", b.dataset.askmode === ASK_MODE));
+    $$(".seg-btn").forEach((b) => b.classList.toggle("active", b.dataset.askmode === ASK_MODE));
     const hint = $("#ask-mode-hint");
     if (hint) hint.textContent = ASKMODE_HINTS[ASK_MODE];
     $("#ask-form-wrap")?.classList.remove("hidden");
@@ -246,7 +246,7 @@
     } else { loadHistory(); }
   }
 
-  $$(".ask-mode").forEach((b) => b.addEventListener("click", () => setAskMode(b.dataset.askmode)));
+  $$(".seg-btn").forEach((b) => b.addEventListener("click", () => setAskMode(b.dataset.askmode)));
 
   // ---------- CONVERSATIONS ----------
   function chatMsgHtml(m) {
@@ -268,11 +268,11 @@
     const box = $("#chat-thread");
     $("#chat-title").textContent = (thread && thread.title) || "New conversation";
     $("#chat-sub").textContent = messages?.length
-      ? `${messages.length} message${messages.length === 1 ? "" : "s"} · follow up below to keep the thread going`
-      : "Follow-ups keep the thread — ask, then dig deeper.";
+      ? `${messages.length} message${messages.length === 1 ? "" : "s"}`
+      : "";
     box.innerHTML = messages?.length
       ? messages.map(chatMsgHtml).join("")
-      : '<div class="card muted small">Start the conversation — ask your first question below.</div>';
+      : '<div class="chat-empty muted small">Nothing here yet — ask your first question above and the thread starts.</div>';
     box.scrollTop = box.scrollHeight;
   }
 
@@ -291,7 +291,6 @@
     $("#chat-title").textContent = "New conversation";
     renderThread(null, []);
     $("#chat-followups").innerHTML = "";
-    $("#chat-thread").innerHTML = '<div class="card muted small">Start the conversation — ask your first question below.</div>';
     $("#ask-input")?.focus();
     loadThreads();
   }
@@ -417,15 +416,18 @@
 
   function fillScopeSelects() {
     if (!TAX) return;
-    $("#scope-jur").innerHTML = '<option value="">Any jurisdiction</option>' + TAX.jurisdictions.map((j) => `<option>${j}</option>`).join("");
-    $("#scope-inst").innerHTML = '<option value="">Any instrument</option>' + TAX.instruments.map((j) => `<option>${j}</option>`).join("");
-    $("#scope-area").innerHTML = '<option value="">Any legal area</option>' + SCOPE_AREAS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    $("#scope-jur").innerHTML = '<option value="">Jurisdiction</option>' + TAX.jurisdictions.map((j) => `<option>${j}</option>`).join("");
+    $("#scope-inst").innerHTML = '<option value="">Instrument</option>' + TAX.instruments.map((j) => `<option>${j}</option>`).join("");
+    $("#scope-area").innerHTML = '<option value="">Legal area</option>' + SCOPE_AREAS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
     ["#scope-jur", "#scope-area", "#scope-origin", "#scope-status", "#scope-inst", "#scope-body"].forEach((sel) =>
       $(sel)?.addEventListener("input", updateScopeHint));
+    ["#scope-jur", "#scope-area", "#scope-origin", "#scope-status", "#scope-inst"].forEach((sel) =>
+      $(sel)?.addEventListener("change", updateScopeHint));
     $("#scope-clear")?.addEventListener("click", () => {
       ["#scope-jur", "#scope-area", "#scope-origin", "#scope-status", "#scope-inst", "#scope-body"].forEach((sel) => { $(sel).value = ""; });
       updateScopeHint();
     });
+    updateScopeHint();
   }
 
   function currentScope() {
@@ -442,10 +444,14 @@
   function updateScopeHint() {
     const sc = currentScope();
     const hint = $("#scope-hint");
+    const clearBtn = $("#scope-clear");
+    if (clearBtn) clearBtn.classList.toggle("hidden", !sc);
     if (!hint) return;
-    if (!sc) { hint.classList.add("hidden"); hint.textContent = ""; return; }
-    const labels = { jurisdiction: "jurisdiction", taxonomy_area: "legal area", origin: "origin", temporal_status: "status", instrument: "instrument", issuing_body: "issuing body" };
-    hint.textContent = "🎯 Scoping active — answers limited to: " + Object.entries(sc).map(([k, v]) => `${labels[k]}=${v}`).join(", ");
+    if (!sc) { hint.classList.add("hidden"); hint.innerHTML = ""; return; }
+    const labels = { jurisdiction: "Jurisdiction", taxonomy_area: "Area", origin: "Origin", temporal_status: "Status", instrument: "Instrument", issuing_body: "Body" };
+    hint.innerHTML = Object.entries(sc)
+      .map(([k, v]) => `<span class="scope-chip">${esc(labels[k] || k)}: <b>${esc(v)}</b></span>`)
+      .join("");
     hint.classList.remove("hidden");
   }
 

@@ -13,13 +13,10 @@
     document.documentElement.dataset.theme = "dark";
   }
 </script>
-<link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="styles.css?v=9">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
-.ask-bar { display:flex; gap:10px; margin:18px 0 10px; }
-.ask-bar input { flex:1; padding:14px 16px; border-radius:12px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:15px; outline:none; }
-.ask-bar input:focus { border-color: var(--blue); }
 .scope-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 26px; padding:10px 12px; border:1px dashed var(--border); border-radius:12px; background:rgba(79,140,255,.04); }
 .scope-bar .scope-label { font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; margin-right:2px; }
 .scope-bar select, .scope-bar input[type=text] { padding:7px 10px; border-radius:9px; border:1px solid var(--border); background:var(--bg2); color:var(--text); font-size:13px; outline:none; max-width:170px; }
@@ -169,56 +166,62 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
       <h1>Ask the Workbench</h1>
       <p class="lede">Answers are grounded in the reviewer-approved knowledge base. Every answer cites what it relied on.</p>
 
-      <div class="ask-modes" id="ask-modes">
-        <button class="ask-mode active" data-askmode="single">💬 Single question</button>
-        <button class="ask-mode" data-askmode="chat">🧵 Conversation</button>
-        <span class="ask-mode-hint muted small" id="ask-mode-hint">One question, one cited answer.</span>
+      <div class="composer" id="ask-form-wrap">
+        <div class="composer-top">
+          <div class="seg" id="ask-modes" role="tablist" aria-label="Answer mode">
+            <button class="seg-btn active" data-askmode="single" role="tab" title="One question, one cited answer">💬 Single</button>
+            <button class="seg-btn" data-askmode="chat" role="tab" title="Multi-turn thread with saved history">🧵 Conversation</button>
+          </div>
+          <span class="composer-hint" id="ask-mode-hint"></span>
+        </div>
+
+        <div class="composer-input">
+          <input id="ask-input" placeholder="e.g. Do the EDPB legitimate-interest guidelines change our cookie analytics position?" maxlength="800">
+          <button class="btn primary" id="ask-btn">Ask</button>
+        </div>
+
+        <div class="filter-row" id="scope-bar">
+          <span class="filter-label">🎯 Scope</span>
+          <select id="scope-jur" title="Jurisdiction"><option value="">Jurisdiction</option></select>
+          <select id="scope-area" title="Legal area"><option value="">Legal area</option></select>
+          <select id="scope-origin" title="Source origin">
+            <option value="">Origin</option>
+            <option value="external">External (public law)</option>
+            <option value="internal">Internal (company)</option>
+          </select>
+          <select id="scope-status" title="Document status">
+            <option value="">Status</option>
+            <option value="IN_FORCE">In force</option>
+            <option value="DRAFT">Draft</option>
+            <option value="PROPOSED">Proposed</option>
+            <option value="SUPERSEDED">Superseded</option>
+            <option value="REPEALED">Repealed</option>
+          </select>
+          <select id="scope-inst" title="Instrument type"><option value="">Instrument</option></select>
+          <input type="text" id="scope-body" placeholder="Issuing body…" title="Issuing body (free text)" maxlength="60">
+          <button class="btn tiny filter-clear hidden" id="scope-clear">Clear</button>
+        </div>
+        <div class="scope-chips hidden" id="scope-hint"></div>
       </div>
 
-      <div class="ask-bar">
-        <input id="ask-input" placeholder="e.g. Do the EDPB legitimate-interest guidelines change our cookie analytics position?" maxlength="800">
-        <button class="btn primary" id="ask-btn">Ask</button>
-      </div>
-      <div class="scope-bar" id="scope-bar">
-        <span class="scope-label">🎯 Scope</span>
-        <select id="scope-jur" title="Jurisdiction"><option value="">Any jurisdiction</option></select>
-        <select id="scope-area" title="Legal area"><option value="">Any legal area</option></select>
-        <select id="scope-origin" title="Source origin">
-          <option value="">Any origin</option>
-          <option value="external">External (public law)</option>
-          <option value="internal">Internal (company)</option>
-        </select>
-        <select id="scope-status" title="Document status">
-          <option value="">Any status</option>
-          <option value="IN_FORCE">In force</option>
-          <option value="DRAFT">Draft</option>
-          <option value="PROPOSED">Proposed</option>
-          <option value="SUPERSEDED">Superseded</option>
-          <option value="REPEALED">Repealed</option>
-        </select>
-        <select id="scope-inst" title="Instrument type"><option value="">Any instrument</option></select>
-        <input type="text" id="scope-body" placeholder="Issuing body…" title="Issuing body (free text)" maxlength="60">
-        <button class="btn tiny" id="scope-clear">Clear</button>
-      </div>
-      <p class="scope-active-hint hidden" id="scope-hint"></p>
       <div id="ask-loading" class="hidden card" style="text-align:center"><span class="spin"></span> <span class="muted small">Researching…</span></div>
       <div id="ask-result"></div>
 
       <!-- conversation mode -->
       <div id="chat-pane" class="hidden">
         <div class="chat-head">
-          <div>
-            <div class="chat-title" id="chat-title">New conversation</div>
-            <div class="muted small" id="chat-sub">Follow-ups keep the thread — ask, then dig deeper.</div>
+          <div class="chat-head-main">
+            <span class="chat-title" id="chat-title">New conversation</span>
+            <span class="chat-sub muted small" id="chat-sub"></span>
           </div>
-          <button class="btn small primary" id="chat-new-btn">＋ New conversation</button>
+          <button class="btn small" id="chat-new-btn">＋ New</button>
         </div>
         <div id="chat-thread" class="chat-thread"></div>
         <div id="chat-loading" class="hidden card" style="text-align:center"><span class="spin"></span> <span class="muted small">Thinking…</span></div>
         <div id="chat-followups" class="chat-followups"></div>
       </div>
 
-      <div class="section-head"><h2 id="history-heading">💬 Your recent questions</h2></div>
+      <div class="section-head history-head"><h2 id="history-heading">💬 Your recent questions</h2></div>
       <div id="history"></div>
     </section>
 
@@ -466,6 +469,6 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
   </main>
 </div>
 
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

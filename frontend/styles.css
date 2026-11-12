@@ -393,16 +393,43 @@ html[data-theme="light"] .aud-disclaimer { color: #765212; }
 
 
 /* ---------- Ask: mode switch + conversations ---------- */
-.ask-modes { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:14px 0 0; }
-.ask-mode { padding:8px 15px; border-radius:20px; border:1px solid var(--border); background:var(--panel);
-  color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; }
-.ask-mode:hover { color:var(--text); border-color:var(--blue); }
-.ask-mode.active { color:var(--text); border-color:rgba(79,140,255,.55); background:rgba(79,140,255,.20); }
-.ask-mode-hint { margin-left:2px; }
+/* Unified ask composer: mode segment + input + scope filters in one card */
+.composer { background:var(--panel); border:1px solid var(--border); border-radius:14px;
+  padding:14px; margin-top:16px; }
+.composer-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:11px; }
+.seg { display:inline-flex; background:var(--bg2); border:1px solid var(--border);
+  border-radius:10px; padding:3px; gap:3px; }
+.seg-btn { border:none; background:transparent; color:var(--muted); font-size:12.5px; font-weight:600;
+  padding:6px 13px; border-radius:7px; cursor:pointer; transition:all .15s; white-space:nowrap; }
+.seg-btn:hover { color:var(--text); }
+.seg-btn.active { background:var(--panel); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.22); }
+.composer-hint { font-size:11.5px; color:var(--muted); }
+.composer-input { display:flex; gap:9px; }
+.composer-input input { flex:1; min-width:0; background:var(--bg2); border:1px solid var(--border);
+  border-radius:10px; padding:11px 14px; color:var(--text); font-size:14px; font-family:inherit; }
+.composer-input input:focus { outline:none; border-color:var(--blue); }
+.composer-input .btn { white-space:nowrap; }
+.filter-row { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:11px;
+  padding-top:11px; border-top:1px solid var(--border); }
+.filter-label { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+  font-weight:700; margin-right:2px; }
+.filter-row select, .filter-row input { background:var(--bg2); border:1px solid var(--border);
+  color:var(--text); border-radius:8px; padding:6px 9px; font-size:12px; font-family:inherit; max-width:170px; }
+.filter-row select:focus, .filter-row input:focus { outline:none; border-color:var(--blue); }
+.filter-row select { cursor:pointer; }
+.filter-row input#scope-body { width:130px; }
+.filter-clear { margin-left:auto; }
+.scope-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.scope-chip { font-size:11px; padding:3px 9px; border-radius:20px; background:rgba(79,140,255,.13);
+  border:1px solid rgba(79,140,255,.32); color:var(--muted); }
+.scope-chip b { color:var(--text); font-weight:600; }
+.chat-empty { padding:18px 2px; }
+.history-head { margin-top:26px; }
 
 .chat-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-  padding:14px 0 12px; border-bottom:1px solid var(--border); margin-bottom:16px; }
-.chat-title { font-weight:700; font-size:15px; }
+  padding:0 0 10px; border-bottom:1px solid var(--border); margin:18px 0 14px; }
+.chat-head-main { display:flex; align-items:baseline; gap:9px; min-width:0; flex-wrap:wrap; }
+.chat-title { font-weight:700; font-size:14.5px; }
 .chat-thread { display:flex; flex-direction:column; gap:14px; max-height:60vh; overflow-y:auto; padding-right:4px; }
 .chat-msg { display:flex; gap:10px; align-items:flex-start; }
 .chat-msg .av { flex-shrink:0; width:28px; height:28px; border-radius:9px; display:flex; align-items:center;
@@ -427,7 +454,7 @@ html[data-theme="light"] .aud-disclaimer { color: #765212; }
 .thread-del { flex-shrink:0; background:transparent; border:none; color:var(--muted); cursor:pointer;
   font-size:14px; padding:4px 6px; border-radius:7px; }
 .thread-del:hover { color:var(--red); background:rgba(248,113,113,.12); }
-html[data-theme="light"] .ask-mode.active, html[data-theme="light"] .tab.active {
+html[data-theme="light"] .seg-btn.active, html[data-theme="light"] .tab.active {
   color: #244d91; border-color: rgba(49,104,201,.35); background: rgba(49,104,201,.10);
 }
 @media (max-width:600px) {
