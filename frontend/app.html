@@ -153,7 +153,7 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
       <a href="#ask" class="nav-link active" data-screen="ask"><span class="nav-icon">⚡</span> Ask</a>
       <a href="#kb" class="nav-link" data-screen="kb"><span class="nav-icon">🧱</span> Knowledge Base</a>
       <a href="#sources" class="nav-link" data-screen="sources"><span class="nav-icon">📚</span> Sources</a>
-      <a href="#auditor" class="nav-link" data-screen="auditor"><span class="nav-icon">🔎</span> Compliance Center</a>
+      <a href="#compliance" class="nav-link" data-screen="compliance"><span class="nav-icon">🔎</span> Compliance Center <span class="nav-tag" id="compliance-count"></span></a>
       <a href="#review" class="nav-link hidden" data-screen="review" id="nav-review"><span class="nav-icon">🛡</span> Review <span class="nav-tag" id="review-count"></span></a>
     </nav>
     <div class="sidebar-footer">
@@ -296,9 +296,39 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
       <div id="sources-list"><span class="spin"></span></div>
     </section>
 
-    <!-- REVIEW (reviewer only) -->
+    <!-- COMPLIANCE CENTER — HUB -->
+    <section id="compliance" class="screen">
+      <div class="eyebrow">Compliance tooling</div>
+      <h1>Compliance Center</h1>
+      <p class="lede">Two screening modules that watch your web properties over time. Every score is a screening signal for human follow-up — not a legal opinion or a compliance determination.</p>
+
+      <div class="hub-grid" id="hub-cards">
+        <a class="hub-card" href="#compliance/notices">
+          <div class="hub-icon">📄</div>
+          <div class="hub-body">
+            <h2>Privacy Notice Compliance</h2>
+            <p>Screen privacy notices against a GDPR Art. 13 / ePrivacy Art. 5(3) / Swiss FADP checklist, track changes over time, and review newly detected gaps.</p>
+            <div class="hub-kpis" id="hub-notices-kpis"><span class="muted small">Loading…</span></div>
+          </div>
+          <div class="hub-go">Open module →</div>
+        </a>
+        <a class="hub-card" href="#compliance/cookies">
+          <div class="hub-icon">🍪</div>
+          <div class="hub-body">
+            <h2>Cookie &amp; Tracker Compliance</h2>
+            <p>Inspect how cookies and trackers are used: banner and consent controls, disclosure of categories, and non-essential cookies set before consent. Jurisdiction-aware — EU opt-in vs Swiss opt-out.</p>
+            <div class="hub-kpis" id="hub-cookies-kpis"><span class="muted small">Loading…</span></div>
+          </div>
+          <div class="hub-go">Open module →</div>
+        </a>
+      </div>
+
+      <div class="aud-disclaimer" style="margin-top:18px">Both modules are automated screening tools. They check text and markup patterns; they do not verify that a notice or banner is accurate, complete, or matches actual processing.</div>
+    </section>
+
     <!-- PRIVACY NOTICE COMPLIANCE CENTER -->
     <section id="auditor" class="screen">
+      <div class="crumb"><a href="#compliance">Compliance Center</a> <span>›</span> Privacy Notice Compliance</div>
       <div class="eyebrow">Compliance tooling</div>
       <h1>Privacy Notice Compliance Center</h1>
       <p class="lede">Screen privacy notices over time with a GDPR Art. 13 / ePrivacy Art. 5(3) checklist and optional qualitative review. Scores are screening signals for human follow-up — not a legal opinion or a compliance determination.</p>
@@ -344,6 +374,71 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
       <div id="aud-history"><span class="spin"></span></div>
     </section>
 
+    <!-- COOKIE & TRACKER COMPLIANCE -->
+    <section id="cookies" class="screen">
+      <div class="crumb"><a href="#compliance">Compliance Center</a> <span>›</span> Cookie &amp; Tracker Compliance</div>
+      <div class="eyebrow">Compliance tooling</div>
+      <h1>Cookie &amp; Tracker Compliance</h1>
+      <p class="lede">Static screening of cookie banners, consent controls and trackers. Choose the jurisdiction that applies — EU and UK require prior opt-in, Switzerland works on an opt-out basis under Art. 45c TCA, California requires an opt-out of sale/share.</p>
+
+      <div class="aud-disclaimer">Static analysis only. The scanner inspects the HTML and initial response the server sends, before any consent interaction. It cannot render JavaScript banners, cannot prove what fires after a click, and cannot judge colour/contrast dark patterns — those need headless testing and human review.</div>
+
+      <div class="card aud-form">
+        <div class="aud-row">
+          <input id="ck-url" placeholder="https://company.com" maxlength="500">
+          <button class="btn primary" id="ck-btn">Run one-off scan</button>
+        </div>
+        <div class="aud-row" style="margin-top:10px">
+          <input id="ck-label" placeholder="Label (optional) — e.g. 'Acme · marketing site'" maxlength="200">
+          <label class="ck-juris">Jurisdiction
+            <select id="ck-juris">
+              <option value="EU+CH" selected>EU + Switzerland</option>
+              <option value="EU">EU / EEA (opt-in)</option>
+              <option value="CH">Switzerland only (opt-out)</option>
+              <option value="UK">United Kingdom (PECR)</option>
+              <option value="US-CA">California (CCPA/CPRA)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div id="ck-loading" class="hidden card" style="text-align:center;margin-top:14px">
+        <span class="spin"></span> <span class="muted small">Fetching the page, the cookie policy and running the checklist…</span>
+      </div>
+      <div id="ck-result"></div>
+
+      <div class="section-head aud-monitor-head"><div><h2>🍪 Cookie Monitor</h2>
+        <p class="muted small">Track sites over time. Newly detected cookie-compliance gaps are queued for your review.</p></div></div>
+      <div class="aud-disclaimer">Screening signals only — not a legal opinion or a compliance determination.</div>
+      <div class="card aud-monitor-form">
+        <h3>Track a website</h3>
+        <div class="aud-monitor-fields">
+          <input id="ck-mon-url" placeholder="Website URL (https://company.com)" maxlength="500">
+          <input id="ck-mon-label" placeholder="Label (optional)" maxlength="200">
+          <label class="ck-juris">Jurisdiction
+            <select id="ck-mon-juris">
+              <option value="EU+CH" selected>EU + Switzerland</option>
+              <option value="EU">EU / EEA (opt-in)</option>
+              <option value="CH">Switzerland only (opt-out)</option>
+              <option value="UK">United Kingdom (PECR)</option>
+              <option value="US-CA">California (CCPA/CPRA)</option>
+            </select>
+          </label>
+          <label class="mon-interval">Check every
+            <select id="ck-mon-interval"><option value="24">24 hours</option><option value="168" selected>7 days</option><option value="336">14 days</option><option value="720">30 days</option></select>
+          </label>
+          <button class="btn primary" id="ck-mon-add">＋ Track website</button>
+        </div>
+      </div>
+      <div class="aud-monitor-kpis" id="ck-kpis"></div>
+      <div class="aud-monitor-grid">
+        <div><div class="section-head"><h2>Websites</h2><button class="btn small" id="ck-refresh">Refresh</button></div><div id="ck-sites"><span class="spin"></span></div></div>
+        <div><div class="section-head"><h2>🧑‍⚖️ Cookie review queue</h2></div><div id="ck-reviews"><span class="spin"></span></div></div>
+      </div>
+      <div class="section-head"><h2>🗂 Past cookie scans</h2></div>
+      <div id="ck-history"><span class="spin"></span></div>
+    </section>
+
     <section id="review" class="screen">
       <div class="eyebrow">Human in the loop</div>
       <h1>Review Queue</h1>
@@ -371,6 +466,6 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
   </main>
 </div>
 
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

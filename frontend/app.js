@@ -109,10 +109,39 @@
     fillSourceFormSelects();
     wireNav();
     await Promise.all([loadHistory(), loadSources(), ME.role === "reviewer" ? loadQueue() : Promise.resolve()]);
+    // Honour a deep link (#compliance/cookies) on load, else show the default screen.
+    const initial = routeFromHash();
+    if (location.hash) showScreen(initial);
   }
 
   // login moved to /login.html
   // ---------- nav ----------
+  function routeFromHash() {
+    const raw = (location.hash || "").replace(/^#/, "").trim();
+    // #compliance/notices and #compliance/cookies are the shareable module links.
+    const parts = raw.split("/").filter(Boolean);
+    if (parts[0] === "compliance" && parts[1] === "notices") return "auditor";
+    if (parts[0] === "compliance" && parts[1] === "cookies") return "cookies";
+    const id = parts[0] || "ask";
+    if (id === "compliance") return "compliance";
+    if (id === "auditor") return "auditor";
+    if (id === "cookies") return "cookies";
+    if (["ask", "kb", "sources", "review"].includes(id)) return id;
+    return "ask";
+  }
+
+  function showScreen(id) {
+    if (id === "review" && ME && ME.role !== "reviewer") return;
+    $$(".nav-link").forEach((x) => x.classList.toggle("active", x.dataset.screen === id));
+    $$(".screen").forEach((s) => s.classList.toggle("visible", s.id === id));
+    if (id === "kb") loadKB();
+    if (id === "review") loadQueue();
+    if (id === "compliance") loadHub();
+    if (id === "auditor") { loadAudits(); loadMonitors(); }
+    if (id === "cookies") { loadCookieScans(); loadCookieMonitors(); }
+    if (id === "ask") { if (ASK_MODE === "chat") loadThreads(); else loadHistory(); }
+  }
+
   function wireNav() {
     const lo = $("#logout-btn");
     if (lo) lo.onclick = async () => {
@@ -123,14 +152,19 @@
     $$(".nav-link").forEach((a) => a.addEventListener("click", (e) => {
       e.preventDefault();
       const id = a.dataset.screen;
-      $$(".nav-link").forEach((x) => x.classList.remove("active"));
-      a.classList.add("active");
-      $$(".screen").forEach((s) => s.classList.toggle("visible", s.id === id));
-      if (id === "kb") loadKB();
-      if (id === "review") loadQueue();
-      if (id === "auditor") { loadAudits(); loadMonitors(); }
-      if (id === "ask") { if (ASK_MODE === "chat") loadThreads(); else loadHistory(); }
+      const target = id === "compliance" ? "#compliance" : "#" + id;
+      if (location.hash !== target) location.hash = target;
+      else showScreen(id);   // same hash → no hashchange event, render explicitly
     }));
+    // In-screen links (hub cards, breadcrumbs) are plain anchors — intercept them too.
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest('a[href^="#"]');
+      if (!a || a.classList.contains("nav-link")) return;
+      e.preventDefault();
+      const h = a.getAttribute("href");
+      if (location.hash === h) showScreen(routeFromHash()); else location.hash = h;
+    });
+    window.addEventListener("hashchange", () => showScreen(routeFromHash()));
     $$(".tab").forEach((t) => t.addEventListener("click", () => {
       $$(".tab").forEach((x) => x.classList.remove("active"));
       t.classList.add("active");
@@ -1148,6 +1182,332 @@
 
   $("#aud-btn")?.addEventListener("click", runAudit);
   $("#aud-url")?.addEventListener("keydown", (e) => { if (e.key === "Enter") runAudit(); });
+
+
+  // ═══════════════════ Compliance Center hub ═══════════════════
+
+  function hubKpis(s) {
+    if (!s) return '<span class="muted small">No data</span>';
+    const avg = s.avg_score == null ? "—" : s.avg_score + "%";
+    const last = s.last_scan_at ? new Date(s.last_scan_at).toLocaleDateString() : "never";
+    return `<span><b>${esc(s.sites ?? 0)}</b> tracked</span>
+      <span><b>${esc(avg)}</b> avg score</span>
+      <span class="${s.pending ? "warn" : ""}"><b>${esc(s.pending ?? 0)}</b> to review</span>
+      <span class="muted">last scan ${esc(last)}</span>`;
+  }
+
+  function hubGrades(s) {
+    const g = (s && s.grades) || {};
+    const total = Object.values(g).reduce((a, b) => a + b, 0);
+    if (!total) return "";
+    return `<div class="hub-grades">${["A", "B", "C", "D", "F"].filter((k) => g[k])
+      .map((k) => `<span class="grade-badge tiny ${gradeClass(k)}"><span class="g">${k}</span><span class="p">${g[k]}</span></span>`).join("")}</div>`;
+  }
+
+  async function loadHub() {
+    const nEl = $("#hub-notices-kpis"), cEl = $("#hub-cookies-kpis");
+    if (!nEl && !cEl) return;
+    try {
+      const s = await api("/api/compliance/summary");
+      if (nEl) { nEl.innerHTML = hubKpis(s.notices); }
+      if (cEl) { cEl.innerHTML = hubKpis(s.cookies); }
+      const nCard = nEl && nEl.closest(".hub-card");
+      const cCard = cEl && cEl.closest(".hub-card");
+      if (nCard) nCard.querySelector(".hub-go").insertAdjacentHTML("beforebegin", hubGrades(s.notices));
+      if (cCard) cCard.querySelector(".hub-go").insertAdjacentHTML("beforebegin", hubGrades(s.cookies));
+      const badge = $("#compliance-count");
+      if (badge) {
+        const total = (s.notices?.pending || 0) + (s.cookies?.pending || 0);
+        badge.textContent = total ? String(total) : "";
+        badge.classList.toggle("hidden", !total);
+      }
+    } catch (e) {
+      if (nEl) nEl.innerHTML = `<span class="muted small">Unavailable: ${esc(e.message)}</span>`;
+      if (cEl) cEl.innerHTML = `<span class="muted small">Unavailable: ${esc(e.message)}</span>`;
+    }
+  }
+
+  // ═══════════════════ Cookie & Tracker Compliance ═══════════════════
+
+  const COOKIE_JURIS_LABEL = {
+    "EU": "EU / EEA", "CH": "Switzerland", "UK": "United Kingdom", "US-CA": "California",
+  };
+
+  function jurisChips(list) {
+    return (list || []).map((j) => `<span class="badge blue">${esc(COOKIE_JURIS_LABEL[j] || j)}</span>`).join(" ");
+  }
+
+  function cookieSpark(history) {
+    const pts = (history || []).filter((x) => x.status === "done" && Number.isFinite(Number(x.scores?.overall_pct)));
+    if (pts.length < 2) return '<div class="mon-spark-empty">Trend will appear after another scan.</div>';
+    const vals = pts.map((x) => Number(x.scores.overall_pct));
+    const min = Math.min(...vals, 0), max = Math.max(...vals, 100), span = Math.max(max - min, 10), w = 240, h = 34;
+    const xy = vals.map((v, i) => `${(i / (vals.length - 1)) * w},${h - ((v - min) / span) * h}`).join(" ");
+    const grade = String((pts.at(-1).scores || {}).overall_grade || "").toUpperCase();
+    const color = { A: "#3fb950", B: "#4f8cff", C: "#d29922", D: "#fb923c", F: "#f85149" }[grade] || "#8b96b8";
+    return `<svg viewBox="0 0 ${w} ${h}" class="mon-spark" preserveAspectRatio="none" role="img" aria-label="Cookie score trend, latest ${vals.at(-1)}% (grade ${grade || "n/a"})"><polyline points="${xy}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+
+  function cookieSignalsBlock(sig) {
+    if (!sig) return "";
+    const bit = (ok, yes, no) => `<span class="sig ${ok ? "ok" : "no"}">${ok ? "✓" : "✕"} ${esc(ok ? yes : no)}</span>`;
+    const cookies = sig.preconsent_nonessential || [];
+    return `<div class="ck-signals">
+      ${bit(sig.has_banner, "Banner in HTML", "No banner in HTML")}
+      ${bit(sig.has_reject, "Reject option", "No reject option")}
+      ${bit(sig.cmp, `CMP: ${sig.cmp || ""}`, "No known CMP")}
+      ${bit(sig.tcf || sig.google_consent_mode, "Consent signals", "No TCF/Consent Mode")}
+      ${bit(sig.total_cookies === 0, `${sig.total_cookies} cookie(s) set`, `${sig.total_cookies} cookie(s) set`)}
+    </div>
+    ${cookies.length ? `<div class="aud-warn" style="margin-top:8px"><b>${cookies.length} non-essential cookie(s) observed before consent:</b> ${cookies.slice(0, 10).map((c) => esc(c.name) + (c.vendor ? ` <span class="muted">(${esc(c.vendor)})</span>` : "")).join(", ")}</div>` : ""}
+    ${(sig.trackers || []).length ? `<div class="muted small" style="margin-top:6px"><b>Trackers in page source:</b> ${sig.trackers.map((t) => esc(t)).join(" · ")}</div>` : ""}`;
+  }
+
+  function cookieResultCard(r, id) {
+    const s = r.scores || {};
+    const dom = s.domains || {};
+    const order = ["Transparency", "Technical", "ePrivacy", "FADP/TCA", "CCPA/CPRA"];
+    const checks = r.checks || [];
+    const fails = checks.filter((c) => !c.passed);
+    const passes = checks.filter((c) => c.passed);
+    const warnHtml = (r.warnings || []).length
+      ? `<div class="aud-warn" style="margin-top:10px">${r.warnings.map((w) => `<div>⚠ ${esc(w)}</div>`).join("")}</div>` : "";
+    const limHtml = (r.limitations || []).length
+      ? `<details class="mon-review-more" style="margin-top:10px"><summary>What this scan cannot verify</summary><div>${r.limitations.map((l) => `<p>${esc(l)}</p>`).join("")}</div></details>` : "";
+
+    return `<div class="card" style="margin-top:16px"${id ? ` id="ckscan-${id}"` : ""}>
+      <div class="grade-card">
+        <div class="grade-badge ${gradeClass(s.overall_grade)}">
+          <span class="g">${esc(s.overall_grade || "?")}</span>
+          <span class="p">${esc(s.overall_pct ?? 0)}%</span>
+        </div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-weight:700;font-size:15px">${esc(r.label || r.final_url || r.requested_url || "Cookie scan")}</div>
+          <div class="muted small" style="word-break:break-all">${esc(r.final_url || r.requested_url || "")}</div>
+          <div class="muted small" style="margin-top:4px">${esc(s.passed_count ?? 0)}/${esc(s.total_count ?? 0)} checks passed · <span class="badge">static analysis</span></div>
+          <div style="margin-top:6px">${jurisChips(r.jurisdiction)}${(r.consent_model || []).map((m) => `<span class="badge">${esc(m)} model</span>`).join(" ")}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 4px">
+        ${order.filter((k) => dom[k]).map((k) => domainBar(k, dom[k])).join("")}
+      </div>
+      ${cookieSignalsBlock(r.signals)}
+      ${r.review_changes && (r.review_changes.new_findings || []).length ? `<div class="aud-change-box"><b>Scan comparison</b><div class="muted small">${r.review_changes.new_findings.length} new finding(s) · ${(r.review_changes.recovered || []).length} recovered · ${(r.review_changes.still_failing || []).length} ongoing</div></div>` : ""}
+      ${warnHtml}
+      <h3 style="margin:18px 0 6px;font-size:14px">❌ Gaps (${fails.length})</h3>
+      ${fails.length ? fails.map(checkRow).join("") : '<p class="muted small">No checklist failures. 🎉</p>'}
+      ${passes.length ? `<details style="margin-top:12px"><summary class="muted small" style="cursor:pointer">Show ${passes.length} passed checks</summary><div style="margin-top:8px">${passes.map(checkRow).join("")}</div></details>` : ""}
+      ${limHtml}
+      <div class="row-actions" style="margin-top:14px">
+        ${r.signals?.cookie_policy_url ? `<a class="btn small" href="${esc(r.signals.cookie_policy_url)}" target="_blank" rel="noopener">Open cookie policy ↗</a>` : ""}
+        ${id ? `<button class="btn small red" data-ck-del="${id}">Delete</button>` : ""}
+      </div>
+    </div>`;
+  }
+
+  async function runCookieScan() {
+    const url = $("#ck-url").value.trim();
+    if (!url) return toast("Enter a URL");
+    const btn = $("#ck-btn");
+    btn.disabled = true; btn.textContent = "Scanning…";
+    $("#ck-result").innerHTML = "";
+    $("#ck-loading").classList.remove("hidden");
+    try {
+      const r = await api("/api/cookies/scan", { method: "POST", body: {
+        url, label: $("#ck-label").value.trim() || null, jurisdiction: $("#ck-juris").value,
+      } });
+      $("#ck-result").innerHTML = cookieResultCard(r, r.id);
+      wireCookieDelete();
+      loadCookieScans(); loadHub();
+    } catch (e) {
+      $("#ck-result").innerHTML = `<div class="card" style="color:var(--red);margin-top:14px">❌ ${esc(e.message)}</div>`;
+    }
+    $("#ck-loading").classList.add("hidden");
+    btn.disabled = false; btn.textContent = "Run one-off scan";
+  }
+
+  function wireCookieDelete() {
+    $$("button[data-ck-del]").forEach((b) => {
+      if (b.dataset.bound) return;
+      b.dataset.bound = "1";
+      b.onclick = async () => {
+        if (!confirm("Delete this cookie scan?")) return;
+        b.disabled = true;
+        try {
+          await api("/api/cookies/scans/" + b.dataset.ckDel, { method: "DELETE" });
+          toast("🗑 Deleted");
+          document.getElementById("ckscan-" + b.dataset.ckDel)?.remove();
+          loadCookieScans();
+        } catch (e) { toast("❌ " + e.message); b.disabled = false; }
+      };
+    });
+  }
+
+  async function loadCookieScans() {
+    const el = $("#ck-history");
+    if (!el) return;
+    try {
+      const r = await api("/api/cookies/scans?limit=25");
+      if (!r.scans.length) { el.innerHTML = '<p class="muted small">No cookie scans yet.</p>'; return; }
+      el.innerHTML = r.scans.map((s) => {
+        const g = s.scores?.overall_grade || "?";
+        return `<div class="card" style="margin-bottom:9px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="grade-badge ${gradeClass(g)}" style="width:46px;height:46px;border-radius:12px">
+            <span class="g" style="font-size:19px">${esc(g)}</span>
+          </div>
+          <div style="flex:1;min-width:180px">
+            <div style="font-weight:600;font-size:13.5px">${esc(s.label || s.site_url)}</div>
+            <div class="muted" style="font-size:11.5px;word-break:break-all">${esc(s.site_url)}</div>
+            <div class="muted" style="font-size:11px">${new Date(s.created_at).toLocaleString()} · ${esc(s.scores?.overall_pct ?? 0)}% · ${esc(s.jurisdiction || "")}</div>
+          </div>
+          <div class="row-actions" style="margin:0">
+            <button class="btn small" data-ck-open="${s.id}">View</button>
+            <button class="btn small red" data-ck-del="${s.id}">🗑</button>
+          </div>
+        </div>`;
+      }).join("");
+      $$('#ck-history button[data-ck-open]').forEach((b) => b.addEventListener("click", async () => {
+        b.disabled = true;
+        try {
+          const row = await api("/api/cookies/scans/" + b.dataset.ckOpen);
+          $("#ck-result").innerHTML = cookieResultCard({ ...(row.result || {}), label: row.label }, row.id);
+          wireCookieDelete();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (e) { toast("❌ " + e.message); }
+        b.disabled = false;
+      }));
+      wireCookieDelete();
+    } catch (e) { el.innerHTML = `<p class="muted small">${esc(e.message)}</p>`; }
+  }
+
+  function renderCookieMonitors(data) {
+    const t = data.totals || {}, sites = data.monitors || [];
+    $("#ck-kpis").innerHTML = `<div class="mon-kpi"><b>${esc(t.sites || 0)}</b><span>websites</span></div>
+      <div class="mon-kpi"><b>${t.avg_score == null ? "—" : esc(t.avg_score) + "%"}</b><span>avg cookie score</span></div>
+      <div class="mon-kpi ${t.pending ? "alert" : ""}"><b>${esc(t.pending || 0)}</b><span>pending review</span></div>
+      <div class="mon-kpi"><b>${esc(t.high_pending || 0)}</b><span>high priority</span></div>`;
+
+    $("#ck-sites").innerHTML = sites.length ? sites.map((m) => {
+      const status = m.last_status || "scheduled", grade = m.last_grade || "—";
+      return `<article class="card mon-site">
+        <div class="mon-site-top">
+          <div class="mon-site-id"><b>${esc(m.label)}</b>
+            <a href="${esc(m.site_url)}" target="_blank" rel="noopener">${esc(m.site_url)}</a>
+            <div style="margin-top:4px">${jurisChips(String(m.jurisdiction || "").split("+"))}</div>
+          </div>
+          <div class="grade-badge ${monitorGradeClass(grade)}" title="Screening only">
+            <span class="g">${esc(grade)}</span><span class="p">${m.last_score == null ? "—" : esc(m.last_score) + "%"}</span>
+          </div>
+        </div>
+        ${cookieSpark(m.history)}
+        <div class="mon-meta"><span class="mon-status ${status}">${esc(status)}</span>
+          <span>Last: ${m.last_scan_at ? esc(new Date(m.last_scan_at).toLocaleString()) : "Not scanned"}</span>
+          <span>Next: ${esc(new Date(m.next_scan_at).toLocaleString())}</span>
+          <span>Every ${esc(m.interval_hours)}h</span>
+          <span>${m.pending_reviews ? `🧑‍⚖️ ${esc(m.pending_reviews)} to review` : "✓ No pending reviews"}</span></div>
+        ${m.last_error ? `<div class="aud-warn">${esc(m.last_error)}</div>` : ""}
+        <div class="mon-actions">
+          <button class="btn small primary" data-ck-scan="${esc(m.id)}">Scan now</button>
+          <button class="btn small" data-ck-toggle="${esc(m.id)}" data-enabled="${m.enabled ? "1" : "0"}">${m.enabled ? "Pause" : "Resume"}</button>
+          <button class="btn small red" data-ck-remove="${esc(m.id)}">Remove</button>
+        </div></article>`;
+    }).join("") : '<div class="card muted small">No websites tracked yet. Add one above to start monitoring cookies.</div>';
+
+    const reviews = data.reviews || [];
+    $("#ck-reviews").innerHTML = reviews.length ? `<div class="mon-review-list">${reviews.map((r) => {
+      const m = sites.find((x) => String(x.id) === String(r.monitor_id));
+      return `<article class="mon-review">
+        <div class="mon-review-head"><span class="pill ${esc(r.severity)}">${esc(r.severity)}</span><b>${esc(r.title)}</b></div>
+        <div class="muted small">${esc(m?.label || "Website")} · ${esc(String(r.kind).replace(/_/g, " "))} · ${esc(new Date(r.created_at).toLocaleString())}</div>
+        ${r.detail ? `<div class="mon-review-detail"><p class="mon-review-summary">${esc(r.detail.split("\n")[0])}</p>
+          ${r.detail.split("\n").slice(1).filter(Boolean).length ? `<details class="mon-review-more"><summary>Why it matters · what to verify</summary><div>${r.detail.split("\n").slice(1).filter(Boolean).map((x) => `<p>${esc(x)}</p>`).join("")}</div></details>` : ""}</div>` : ""}
+        <div class="mon-actions">
+          <button class="btn small" data-ck-review="${esc(r.id)}" data-status="in_review">Reviewing</button>
+          <button class="btn small" data-ck-review="${esc(r.id)}" data-status="resolved">Resolve</button>
+          <button class="btn small" data-ck-review="${esc(r.id)}" data-status="accepted">Accept risk</button>
+          <button class="btn small" data-ck-review="${esc(r.id)}" data-status="false_positive">False positive</button>
+        </div></article>`;
+    }).join("")}</div>` : '<div class="card muted small">✨ Cookie review queue clear — no pending findings.</div>';
+
+    wireCookieMonitorActions();
+  }
+
+  async function loadCookieMonitors() {
+    if (!$("#ck-sites")) return;
+    try { renderCookieMonitors(await api("/api/cookies/monitors")); }
+    catch (e) { $("#ck-sites").innerHTML = `<div class="card" style="color:var(--red)">Cookie monitor unavailable: ${esc(e.message)}</div>`; }
+  }
+
+  function wireCookieMonitorActions() {
+    $$("[data-ck-scan]").forEach((b) => {
+      if (b.dataset.bound) return; b.dataset.bound = "1";
+      b.onclick = async () => {
+        b.disabled = true; b.textContent = "Scanning…";
+        try {
+          await api(`/api/cookies/monitors/${b.dataset.ckScan}/scan-lock`, { method: "POST" });
+          const r = await api(`/api/cookies/monitors/${b.dataset.ckScan}/scan`, { method: "POST" });
+          $("#ck-result").innerHTML = cookieResultCard(r, r.id);
+          wireCookieDelete();
+          toast(`${(r.created_reviews || []).length} new review item(s)`);
+          await loadCookieMonitors(); loadCookieScans(); loadHub();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (e) { toast("❌ " + e.message); }
+        finally { b.disabled = false; b.textContent = "Scan now"; }
+      };
+    });
+    $$("[data-ck-toggle]").forEach((b) => {
+      if (b.dataset.bound) return; b.dataset.bound = "1";
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          await api(`/api/cookies/monitors/${b.dataset.ckToggle}`, { method: "PATCH", body: { enabled: b.dataset.enabled !== "1" } });
+          await loadCookieMonitors();
+        } catch (e) { toast("❌ " + e.message); b.disabled = false; }
+      };
+    });
+    $$("[data-ck-remove]").forEach((b) => {
+      if (b.dataset.bound) return; b.dataset.bound = "1";
+      b.onclick = async () => {
+        if (!confirm("Stop monitoring this site and delete its cookie scan history?")) return;
+        b.disabled = true;
+        try { await api(`/api/cookies/monitors/${b.dataset.ckRemove}`, { method: "DELETE" }); toast("Cookie monitor removed"); await loadCookieMonitors(); loadHub(); }
+        catch (e) { toast("❌ " + e.message); b.disabled = false; }
+      };
+    });
+    $$("[data-ck-review]").forEach((b) => {
+      if (b.dataset.bound) return; b.dataset.bound = "1";
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await api(`/api/cookies/reviews/${b.dataset.ckReview}`, { method: "PATCH", body: { status: b.dataset.status } }); toast("Review updated"); await loadCookieMonitors(); loadHub(); }
+        catch (e) { toast("❌ " + e.message); b.disabled = false; }
+      };
+    });
+    const addBtn = $("#ck-mon-add");
+    if (addBtn && !addBtn.dataset.bound) {
+      addBtn.dataset.bound = "1";
+      addBtn.onclick = async () => {
+        const url = $("#ck-mon-url").value.trim();
+        if (!url) return toast("Enter a website URL");
+        addBtn.disabled = true;
+        try {
+          const out = await api("/api/cookies/monitors", { method: "POST", body: {
+            url, label: $("#ck-mon-label").value.trim() || null,
+            jurisdiction: $("#ck-mon-juris").value,
+            interval_hours: Number($("#ck-mon-interval").value),
+          } });
+          $("#ck-mon-url").value = ""; $("#ck-mon-label").value = "";
+          toast(out.existing ? "Monitor updated" : "Website added — first scan is due");
+          await loadCookieMonitors(); loadHub();
+        } catch (e) { toast("❌ " + e.message); }
+        addBtn.disabled = false;
+      };
+    }
+    const rf = $("#ck-refresh");
+    if (rf && !rf.dataset.bound) { rf.dataset.bound = "1"; rf.onclick = () => loadCookieMonitors(); }
+  }
+
+  $("#ck-btn")?.addEventListener("click", runCookieScan);
+  $("#ck-url")?.addEventListener("keydown", (e) => { if (e.key === "Enter") runCookieScan(); });
 
   wireThemeToggle();
   boot().catch((e) => { console.error(e); showLogin(); });

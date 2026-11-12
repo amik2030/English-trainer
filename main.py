@@ -54,14 +54,20 @@ monitor_stop = asyncio.Event()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Lightweight in-process scheduler. DB leases prevent overlapping scans if
-    # a web worker restarts while it is fetching a notice.
+    # Lightweight in-process schedulers. DB leases prevent overlapping scans if
+    # a web worker restarts while it is fetching.
     task = asyncio.create_task(_monitor_scheduler())
+    cookie_task = asyncio.create_task(_cookie_scheduler())
     yield
     monitor_stop.set()
+    cookie_task.cancel()
     task.cancel()
     try:
         await task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await cookie_task
     except asyncio.CancelledError:
         pass
 
@@ -852,6 +858,10 @@ async def set_role(request: Request):
 # ---------------- PRIVACY NOTICE AUDITOR ----------------
 from notice_auditor import audit as audit_notice, ALL_CHECKS
 from privacy_monitor import compare_results, result_fingerprint, review_detail, event_review_detail
+from cookie_auditor import (
+    audit_cookies, CHECKS as COOKIE_CHECKS, JURISDICTIONS as COOKIE_JURISDICTIONS,
+    resolve_jurisdictions, grade_for as cookie_grade_for, LIMITATIONS as COOKIE_LIMITATIONS,
+)
 
 
 class AuditRequest(BaseModel):
@@ -1446,6 +1456,469 @@ async def auditor_monitor_review_update(review_id: int, req: MonitorReviewUpdate
     }
     out = admin.table("monitor_reviews").update(update).eq("id", review_id).execute().data
     return {"review": (out or [review])[0]}
+
+
+# ============================================================================
+# Cookie & Tracker Compliance module (Tier A — static analysis)
+# ============================================================================
+
+
+class CookieScanRequest(BaseModel):
+    url: str
+    label: Optional[str] = None
+    jurisdiction: Optional[str] = None   # "EU" | "CH" | "EU+CH" | "UK" | "US-CA"
+
+
+class CookieMonitorRequest(BaseModel):
+    url: str
+    label: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    interval_hours: int = 168
+
+
+class CookieMonitorUpdate(BaseModel):
+    label: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    interval_hours: Optional[int] = None
+    enabled: Optional[bool] = None
+
+
+def _cookie_monitor_owned(monitor_id: int, prof: dict) -> dict:
+    rows = admin.table("cookie_monitors").select("*").eq("id", monitor_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "cookie monitor not found")
+    if rows[0]["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your cookie monitor")
+    return rows[0]
+
+
+def _cookie_severity(check: dict) -> str:
+    weight = int(check.get("weight") or 1)
+    return "high" if weight >= 3 else "medium" if weight == 2 else "low"
+
+
+def _cookie_failed_map(result: Optional[dict]) -> dict:
+    if not result:
+        return {}
+    return {str(c.get("id")): c for c in (result.get("checks") or []) if not c.get("passed")}
+
+
+def _cookie_compare(previous: Optional[dict], current: dict) -> dict:
+    """Diff failed checks: initial / new / regression / recovered."""
+    old_failed = _cookie_failed_map(previous)
+    new_failed = _cookie_failed_map(current)
+    old_all = {str(c.get("id")): c for c in ((previous or {}).get("checks") or [])}
+
+    added = []
+    for key, check in new_failed.items():
+        if key in old_failed:
+            continue
+        prior = old_all.get(key)
+        if previous is None:
+            kind = "initial_finding"
+        elif prior and prior.get("passed"):
+            kind = "regression"
+        else:
+            kind = "new_finding"
+        detail = check.get("detail") or ""
+        if check.get("ref"):
+            detail += f"\nReference: {check['ref']}"
+        if check.get("evidence"):
+            detail += f"\nObserved: {check['evidence']}"
+        added.append({
+            "finding_key": key,
+            "kind": kind,
+            "severity": _cookie_severity(check),
+            "title": check.get("title") or key,
+            "detail": detail,
+            "check": check,
+        })
+    recovered = [
+        {"finding_key": k, "title": v.get("title") or k, "check": v}
+        for k, v in old_failed.items() if k not in new_failed
+    ]
+    still = [{"finding_key": k, **v} for k, v in new_failed.items() if k in old_failed]
+    return {"new_findings": added, "recovered": recovered, "still_failing": still}
+
+
+def _insert_cookie_review(monitor: dict, scan_id: Optional[int], item: dict) -> Optional[dict]:
+    key = str(item.get("finding_key") or "cookie_finding")
+    muted = (admin.table("cookie_reviews").select("id")
+             .eq("monitor_id", monitor["id"]).eq("user_id", monitor["user_id"])
+             .eq("finding_key", key).in_("status", ["accepted", "false_positive"])
+             .limit(1).execute().data or [])
+    if muted:
+        return None
+    active = (admin.table("cookie_reviews").select("id")
+              .eq("monitor_id", monitor["id"]).eq("user_id", monitor["user_id"])
+              .eq("finding_key", key).in_("status", ["pending", "in_review"])
+              .limit(1).execute().data or [])
+    if active:
+        return None
+    row = {
+        "user_id": monitor["user_id"], "monitor_id": monitor["id"], "scan_id": scan_id,
+        "finding_key": key, "kind": item.get("kind", "new_finding"),
+        "severity": item.get("severity", "medium"),
+        "title": item.get("title", "Cookie compliance finding"),
+        "detail": (item.get("detail") or "")[:4000],
+        "status": "pending",
+    }
+    try:
+        ins = admin.table("cookie_reviews").insert(row).execute()
+        return (ins.data or [None])[0]
+    except Exception as e:
+        logger.warning("cookie review insert skipped: %s", e)
+        return None
+
+
+async def _perform_cookie_scan(monitor: dict, trigger: str = "scheduled") -> dict:
+    """Run one cookie scan, persist it, diff against the previous one, queue findings."""
+    monitor_id, user_id = monitor["id"], monitor["user_id"]
+    juris = monitor.get("jurisdiction") or "EU+CH"
+    previous_rows = (admin.table("cookie_scans")
+                     .select("id, result, scores, created_at")
+                     .eq("monitor_id", monitor_id).eq("user_id", user_id)
+                     .eq("status", "done").order("created_at", desc=True).limit(1)
+                     .execute().data or [])
+    previous = previous_rows[0] if previous_rows else None
+    try:
+        result = await audit_cookies(monitor["site_url"], juris)
+        result["fetched_at"] = _now()
+        result["label"] = monitor["label"]
+        result["monitor_id"] = monitor_id
+        result["trigger"] = trigger
+        result["review_changes"] = _cookie_compare(
+            previous.get("result") if previous else None, result)
+
+        ins = admin.table("cookie_scans").insert({
+            "user_id": user_id, "monitor_id": monitor_id, "label": monitor["label"],
+            "site_url": monitor["site_url"], "final_url": result.get("final_url"),
+            "jurisdiction": juris, "status": "done",
+            "scores": result.get("scores") or {}, "result": result,
+            "scan_trigger": trigger,
+            "html_fingerprint": result.get("html_fingerprint"),
+        }).execute()
+        scan_id = (ins.data or [{}])[0].get("id")
+
+        created = []
+        for item in result["review_changes"].get("new_findings", []):
+            review = _insert_cookie_review(monitor, scan_id, item)
+            if review:
+                created.append(review)
+
+        admin.table("cookie_monitors").update({
+            "last_scan_at": _now(),
+            "next_scan_at": (datetime.now(timezone.utc)
+                             + timedelta(hours=monitor["interval_hours"])).isoformat(),
+            "last_status": "needs_review" if created else "done",
+            "last_score": (result.get("scores") or {}).get("overall_pct"),
+            "last_grade": (result.get("scores") or {}).get("overall_grade"),
+            "previous_score": (previous or {}).get("scores", {}).get("overall_pct"),
+            "latest_scan_id": scan_id,
+            "last_error": None, "lease_until": None, "updated_at": _now(),
+        }).eq("id", monitor_id).execute()
+
+        result["created_reviews"] = created
+        result["id"] = scan_id
+        return result
+    except Exception as e:
+        try:
+            admin.table("cookie_scans").insert({
+                "user_id": user_id, "monitor_id": monitor_id, "label": monitor["label"],
+                "site_url": monitor["site_url"], "jurisdiction": juris,
+                "status": "failed", "scores": {}, "result": {}, "error": str(e)[:1000],
+                "scan_trigger": trigger,
+            }).execute()
+        except Exception:
+            pass
+        admin.table("cookie_monitors").update({
+            "last_scan_at": _now(),
+            "next_scan_at": (datetime.now(timezone.utc)
+                             + timedelta(hours=min(monitor["interval_hours"], 24))).isoformat(),
+            "last_status": "failed", "last_error": str(e)[:1000],
+            "lease_until": None, "updated_at": _now(),
+        }).eq("id", monitor_id).execute()
+        raise
+
+
+async def _cookie_scheduler():
+    """Claim and scan due cookie monitors while the web process is up."""
+    while not monitor_stop.is_set():
+        try:
+            claimed = admin.rpc("claim_due_cookie_monitors", {"p_limit": 3}).execute().data or []
+            for monitor in claimed:
+                try:
+                    await _perform_cookie_scan(monitor, "scheduled")
+                except Exception:
+                    pass
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("cookie monitor scheduler pass failed")
+        try:
+            await asyncio.wait_for(monitor_stop.wait(), timeout=90)
+        except asyncio.TimeoutError:
+            pass
+
+
+@app.get("/api/cookies/checks")
+async def cookie_checks(request: Request):
+    await current_user(request)
+    return {
+        "checks": [{"id": c.id, "domain": c.domain, "ref": c.ref, "title": c.title,
+                    "weight": c.weight, "jurisdictions": list(c.jurisdictions)}
+                   for c in COOKIE_CHECKS],
+        "jurisdictions": COOKIE_JURISDICTIONS,
+        "limitations": COOKIE_LIMITATIONS,
+    }
+
+
+@app.post("/api/cookies/scan")
+async def cookie_scan(req: CookieScanRequest, request: Request):
+    prof = await current_user(request)
+    url = _public_http_url(req.url)
+    juris = resolve_jurisdictions(req.jurisdiction)
+    try:
+        result = await audit_cookies(url, "+".join(juris))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"cookie scan failed: {e}")
+
+    result["fetched_at"] = _now()
+    result["label"] = (req.label or "").strip()[:200] or None
+    result["trigger"] = "manual"
+    result["monitor_id"] = None
+    result["review_changes"] = {"new_findings": [], "recovered": [], "still_failing": []}
+    ins = admin.table("cookie_scans").insert({
+        "user_id": prof["id"], "label": result["label"], "site_url": url,
+        "final_url": result.get("final_url"), "jurisdiction": "+".join(juris),
+        "status": "done", "scores": result.get("scores") or {}, "result": result,
+        "scan_trigger": "manual", "html_fingerprint": result.get("html_fingerprint"),
+    }).execute()
+    return {"id": (ins.data or [{}])[0].get("id"), **result}
+
+
+@app.get("/api/cookies/scans")
+async def cookie_scans(request: Request, limit: int = 30):
+    prof = await current_user(request)
+    q = admin.table("cookie_scans").select(
+        "id, label, site_url, jurisdiction, status, scores, created_at")
+    if prof.get("role") != "reviewer":
+        q = q.eq("user_id", prof["id"])
+    rows = q.order("created_at", desc=True).limit(min(limit, 100)).execute().data or []
+    return {"count": len(rows), "scans": rows}
+
+
+@app.get("/api/cookies/scans/{scan_id}")
+async def cookie_scan_get(scan_id: int, request: Request):
+    prof = await current_user(request)
+    rows = admin.table("cookie_scans").select("*").eq("id", scan_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "scan not found")
+    if rows[0]["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your scan")
+    return rows[0]
+
+
+@app.delete("/api/cookies/scans/{scan_id}")
+async def cookie_scan_delete(scan_id: int, request: Request):
+    prof = await current_user(request)
+    rows = admin.table("cookie_scans").select("id, user_id").eq("id", scan_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "scan not found")
+    if rows[0]["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your scan")
+    admin.table("cookie_scans").delete().eq("id", scan_id).execute()
+    return {"ok": True}
+
+
+@app.get("/api/cookies/monitors")
+async def cookie_monitors(request: Request):
+    prof = await current_user(request)
+    monitors = (admin.table("cookie_monitors").select("*").eq("user_id", prof["id"])
+                .order("created_at", desc=True).limit(200).execute().data or [])
+    if not monitors:
+        return {"monitors": [], "reviews": [],
+                "totals": {"sites": 0, "pending": 0, "avg_score": None, "high_pending": 0}}
+
+    ids = [m["id"] for m in monitors]
+    scans = (admin.table("cookie_scans")
+             .select("id, monitor_id, status, scores, created_at, html_fingerprint")
+             .in_("monitor_id", ids).order("created_at", desc=True)
+             .limit(min(1000, len(ids) * 30)).execute().data or [])
+    by_monitor: dict = {}
+    for scan in scans:
+        by_monitor.setdefault(scan["monitor_id"], []).append(scan)
+
+    reviews = (admin.table("cookie_reviews").select("*").eq("user_id", prof["id"])
+               .in_("monitor_id", ids).eq("status", "pending")
+               .order("created_at", desc=True).limit(500).execute().data or [])
+    pending_by_monitor: dict = {}
+    for review in reviews:
+        pending_by_monitor[review["monitor_id"]] = pending_by_monitor.get(review["monitor_id"], 0) + 1
+
+    for m in monitors:
+        history = by_monitor.get(m["id"], [])
+        m["history"] = list(reversed(history[:30]))
+        m["pending_reviews"] = pending_by_monitor.get(m["id"], 0)
+
+    scores = [m["last_score"] for m in monitors if m.get("last_score") is not None]
+    return {
+        "monitors": monitors,
+        "reviews": reviews,
+        "totals": {
+            "sites": len(monitors), "pending": len(reviews),
+            "high_pending": sum(1 for r in reviews if r.get("severity") == "high"),
+            "avg_score": round(sum(scores) / len(scores)) if scores else None,
+        },
+    }
+
+
+@app.post("/api/cookies/monitors")
+async def cookie_monitor_create(req: CookieMonitorRequest, request: Request):
+    prof = await current_user(request)
+    site_url = _public_http_url(req.url)
+    interval = int(req.interval_hours)
+    if interval < 6 or interval > 8760:
+        raise HTTPException(400, "interval_hours must be from 6 (minimum) to 8760 (yearly)")
+    juris = resolve_jurisdictions(req.jurisdiction)
+    label = (req.label or "").strip()[:200] or (urlparse(site_url).hostname or site_url)
+
+    existing = (admin.table("cookie_monitors").select("id")
+                .eq("user_id", prof["id"]).eq("site_url", site_url).execute().data or [])
+    values = {
+        "label": label, "jurisdiction": "+".join(juris), "interval_hours": interval,
+        "enabled": True, "next_scan_at": _now(), "updated_at": _now(),
+        "last_status": "scheduled", "last_error": None,
+    }
+    if existing:
+        row = admin.table("cookie_monitors").update(values).eq("id", existing[0]["id"]).execute().data[0]
+        return {"monitor": row, "existing": True}
+    values.update({"user_id": prof["id"], "site_url": site_url})
+    row = admin.table("cookie_monitors").insert(values).execute().data[0]
+    return {"monitor": row, "existing": False}
+
+
+@app.patch("/api/cookies/monitors/{monitor_id}")
+async def cookie_monitor_update(monitor_id: int, req: CookieMonitorUpdate, request: Request):
+    prof = await current_user(request)
+    monitor = _cookie_monitor_owned(monitor_id, prof)
+    updates = {"updated_at": _now()}
+    if req.label is not None:
+        label = req.label.strip()[:200]
+        if not label:
+            raise HTTPException(400, "label cannot be empty")
+        updates["label"] = label
+    if req.jurisdiction is not None:
+        updates["jurisdiction"] = "+".join(resolve_jurisdictions(req.jurisdiction))
+        updates["next_scan_at"] = _now()
+    if req.interval_hours is not None:
+        if req.interval_hours < 6 or req.interval_hours > 8760:
+            raise HTTPException(400, "interval_hours must be from 6 to 8760")
+        updates["interval_hours"] = req.interval_hours
+        updates["next_scan_at"] = _now()
+    if req.enabled is not None:
+        updates["enabled"] = req.enabled
+        if req.enabled:
+            updates["next_scan_at"] = _now()
+    row = admin.table("cookie_monitors").update(updates).eq("id", monitor_id).execute().data
+    return {"monitor": (row or [monitor])[0]}
+
+
+@app.delete("/api/cookies/monitors/{monitor_id}")
+async def cookie_monitor_delete(monitor_id: int, request: Request):
+    prof = await current_user(request)
+    _cookie_monitor_owned(monitor_id, prof)
+    admin.table("cookie_monitors").delete().eq("id", monitor_id).execute()
+    return {"ok": True}
+
+
+@app.post("/api/cookies/monitors/{monitor_id}/scan-lock")
+async def cookie_monitor_scan_lock(monitor_id: int, request: Request):
+    prof = await current_user(request)
+    _cookie_monitor_owned(monitor_id, prof)
+    now = _now()
+    lease = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+    out = (admin.table("cookie_monitors").update({"lease_until": lease, "updated_at": now})
+           .eq("id", monitor_id).eq("enabled", True)
+           .or_(f"lease_until.is.null,lease_until.lt.{now}")
+           .execute().data or [])
+    if not out:
+        raise HTTPException(409, "a scan is already running or this monitor is paused")
+    return {"monitor": out[0]}
+
+
+@app.post("/api/cookies/monitors/{monitor_id}/scan")
+async def cookie_monitor_scan(monitor_id: int, request: Request):
+    prof = await current_user(request)
+    monitor = _cookie_monitor_owned(monitor_id, prof)
+    if not monitor.get("lease_until") or monitor["lease_until"] <= _now():
+        raise HTTPException(409, "acquire a scan lock before running the scan")
+    try:
+        return await _perform_cookie_scan(monitor, "manual_monitor")
+    except Exception as e:
+        raise HTTPException(502, f"cookie scan failed: {e}")
+
+
+@app.get("/api/cookies/reviews")
+async def cookie_reviews_list(request: Request, status: str = "pending", limit: int = 200):
+    prof = await current_user(request)
+    q = admin.table("cookie_reviews").select("*").eq("status", status)
+    if prof.get("role") != "reviewer":
+        q = q.eq("user_id", prof["id"])
+    rows = q.order("created_at", desc=True).limit(min(max(limit, 1), 500)).execute().data or []
+    return {"reviews": rows}
+
+
+@app.patch("/api/cookies/reviews/{review_id}")
+async def cookie_review_update(review_id: int, req: MonitorReviewUpdate, request: Request):
+    prof = await current_user(request)
+    if req.status not in ("in_review", "resolved", "accepted", "false_positive"):
+        raise HTTPException(400, "status must be in_review|resolved|accepted|false_positive")
+    rows = admin.table("cookie_reviews").select("*").eq("id", review_id).execute().data or []
+    if not rows:
+        raise HTTPException(404, "cookie review not found")
+    review = rows[0]
+    if review["user_id"] != prof["id"] and prof.get("role") != "reviewer":
+        raise HTTPException(403, "not your review item")
+    update = {
+        "status": req.status,
+        "resolution_note": (req.resolution_note or "").strip()[:1000] or None,
+        "updated_at": _now(),
+        "resolved_at": None if req.status == "in_review" else _now(),
+    }
+    out = admin.table("cookie_reviews").update(update).eq("id", review_id).execute().data
+    return {"review": (out or [review])[0]}
+
+
+@app.get("/api/compliance/summary")
+async def compliance_summary(request: Request):
+    """Card data for the Compliance Center hub — one request for the landing page."""
+    prof = await current_user(request)
+
+    def module_stats(table: str, review_table: str) -> dict:
+        rows = (admin.table(table).select("last_score,last_status,last_grade,last_scan_at")
+                .eq("user_id", prof["id"]).limit(500).execute().data or [])
+        pending_rows = (admin.table(review_table).select("id")
+                        .eq("user_id", prof["id"]).eq("status", "pending")
+                        .limit(1000).execute().data or [])
+        scores = [r["last_score"] for r in rows if r.get("last_score") is not None]
+        return {
+            "sites": len(rows),
+            "avg_score": round(sum(scores) / len(scores)) if scores else None,
+            "pending": len(pending_rows),
+            "last_scan_at": max((r.get("last_scan_at") or "" for r in rows), default="") or None,
+            "needs_review": sum(1 for r in rows if r.get("last_status") == "needs_review"),
+            "failed": sum(1 for r in rows if r.get("last_status") == "failed"),
+            "grades": {g: sum(1 for r in rows if r.get("last_grade") == g)
+                       for g in ("A", "B", "C", "D", "F")},
+        }
+
+    return {
+        "notices": module_stats("website_monitors", "monitor_reviews"),
+        "cookies": module_stats("cookie_monitors", "cookie_reviews"),
+    }
 
 
 # ---------------- static frontend (mount last) ----------------
