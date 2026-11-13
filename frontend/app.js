@@ -194,6 +194,39 @@
     </div>`;
   }
 
+  // Collapsed row for the Single-mode history: question on one line, two-line
+  // answer preview, full answer + citations only after expanding.
+  function qaHistoryRow(q, i) {
+    const cits = (q.citations || []).map((c) =>
+      `<span class="cit">↳ <b>${esc(c.kind === "source" ? "source" : c.kind === "qa" ? "prior Q&A" : "knowledge")}</b>: ${esc(c.title)}</span>`).join("<br>");
+    const tags = (q.taxonomy_ids || []).map((t) => `<span class="badge blue">${esc(t)}${TAX?.nodes?.[t] ? " · " + esc(TAX.nodes[t]) : ""}</span>`).join("");
+    const key = "qa" + (q.id ?? i);
+    const meta = `<div class="chat-meta">
+        ${q.kb_reused ? '<span class="badge green">KB reuse</span>' : ""}
+        <span class="badge">confidence ${Math.round((q.confidence ?? 0) * 100) / 100}</span>
+        <span class="badge">${esc(q.jurisdiction || "INTL")}</span>
+        ${q.scope ? Object.entries(q.scope).map(([k, v]) => `<span class="badge purple">🎯 ${esc(k.replace("_", " "))}: ${esc(v)}</span>`).join("") : ""}
+        ${q.kb_counts ? `<span class="badge">KB in scope: ${q.kb_counts.items_in_scope} items / ${q.kb_counts.sources_in_scope} sources</span>` : ""}
+        ${tags}
+      </div>`;
+    return `<div class="thread-item" data-qa="${key}">
+      <div class="thread-row">
+        <span class="thread-caret" data-qa-toggle="${key}">▸</span>
+        <div class="thread-main">
+          <div class="thread-name">${esc(q.question)}</div>
+          <div class="thread-sub">${esc(relTime(q.answered_at || q.created_at))}${q.kb_grounded === false ? " · KB silent" : ""}</div>
+        </div>
+      </div>
+      <div class="thread-summary qa-preview">${esc(q.answer)}</div>
+      <div class="thread-more hidden" data-qa-more="${key}">
+        <div class="qa-full">${esc(q.answer)}</div>
+        ${meta}
+        ${cits ? `<div style="margin-top:8px">${cits}</div>` : '<div style="margin-top:8px" class="cit">↳ general legal knowledge (KB did not cover this — flagged for curation)</div>'}
+        <div class="muted small" style="margin-top:6px">${new Date(q.answered_at || q.created_at).toLocaleString()}</div>
+      </div>
+    </div>`;
+  }
+
   $("#ask-btn")?.addEventListener("click", doAsk);
   $("#ask-input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") doAsk(); });
 
@@ -413,12 +446,29 @@
   $("#chat-new-btn")?.addEventListener("click", newConversation);
 
   async function loadHistory() {
+    const el = $("#history");
+    if (!el) return;
     try {
       const h = await api("/api/history?limit=10");
-      $("#history").innerHTML = h.entries.length
-        ? h.entries.map(qaCard).join("")
-        : '<p class="muted small">No questions yet.</p>';
-    } catch (e) { $("#history").innerHTML = ""; }
+      if (!h.entries.length) {
+        el.innerHTML = '<p class="muted small">No questions yet.</p>';
+        return;
+      }
+      el.innerHTML = h.entries.map((q, i) => qaHistoryRow(q, i)).join("");
+      $$('#history [data-qa-toggle]').forEach((c) => c.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const more = el.querySelector(`[data-qa-more="${c.dataset.qaToggle}"]`);
+        const preview = c.closest(".thread-item")?.querySelector(".qa-preview");
+        if (!more) return;
+        const open = !more.classList.toggle("hidden");
+        c.textContent = open ? "▾" : "▸";
+        if (preview) preview.classList.toggle("hidden", open);
+      }));
+      $$('#history [data-qa]').forEach((d) => d.addEventListener("click", (e) => {
+        if (e.target.closest("[data-qa-toggle]")) return;
+        e.currentTarget.querySelector("[data-qa-toggle]")?.click();
+      }));
+    } catch (e) { el.innerHTML = ""; }
   }
 
   // ---------- SOURCES ----------

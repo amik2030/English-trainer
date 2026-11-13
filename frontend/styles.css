@@ -469,6 +469,10 @@ html[data-theme="light"] .aud-disclaimer { color: #765212; }
 .thread-more.hidden { display:none; }
 .thread-more-role { display:block; font-size:10px; font-weight:700; text-transform:uppercase;
   letter-spacing:.05em; color:var(--blue); margin-bottom:3px; }
+/* Single-mode Q&A history: collapsed preview -> full answer */
+.qa-full { color:var(--text); font-size:13px; line-height:1.6; white-space:pre-wrap;
+  margin-bottom:9px; }
+.qa-preview { white-space:pre-wrap; }
 html[data-theme="light"] .seg-btn.active, html[data-theme="light"] .tab.active {
   color: #244d91; border-color: rgba(49,104,201,.35); background: rgba(49,104,201,.10);
 }
