@@ -108,6 +108,7 @@
     TAX = await api("/api/taxonomy").catch(() => null);
     fillSourceFormSelects();
     wireNav();
+    wireIcta();
     await Promise.all([loadHistory(), loadSources(), ME.role === "reviewer" ? loadQueue() : Promise.resolve()]);
     // Honour a deep link (#compliance/cookies) on load, else show the default screen.
     const initial = routeFromHash();
@@ -122,10 +123,12 @@
     const parts = raw.split("/").filter(Boolean);
     if (parts[0] === "compliance" && parts[1] === "notices") return "auditor";
     if (parts[0] === "compliance" && parts[1] === "cookies") return "cookies";
+    if (parts[0] === "compliance" && parts[1] === "icta") return "icta";
     const id = parts[0] || "ask";
     if (id === "compliance") return "compliance";
     if (id === "auditor") return "auditor";
     if (id === "cookies") return "cookies";
+    if (id === "icta") return "icta";
     if (["ask", "kb", "sources", "review"].includes(id)) return id;
     return "ask";
   }
@@ -139,6 +142,7 @@
     if (id === "compliance") loadHub();
     if (id === "auditor") { loadAudits(); loadMonitors(); }
     if (id === "cookies") { loadCookieScans(); loadCookieMonitors(); }
+    if (id === "icta") renderIcta();
     if (id === "ask") { if (ASK_MODE === "chat") loadThreads(); else loadHistory(); }
   }
 
@@ -1302,6 +1306,16 @@
 
   async function loadHub() {
     const nEl = $("#hub-notices-kpis"), cEl = $("#hub-cookies-kpis");
+    // Demo card KPIs are static — no backend involved.
+    const iEl = $("#hub-icta-kpis");
+    if (iEl) {
+      const total = ICTA_COUNTRIES.length;
+      const signed = ICTA_COUNTRIES.filter((c) => c.signed).length;
+      iEl.innerHTML = `<span><b>${total}</b> countries</span>
+        <span><b>${signed}</b> signed</span>
+        <span class="warn"><b>${total - signed}</b> pending</span>
+        <span class="muted">sample data</span>`;
+    }
     if (!nEl && !cEl) return;
     try {
       const s = await api("/api/compliance/summary");
@@ -1600,6 +1614,147 @@
     }
     const rf = $("#ck-refresh");
     if (rf && !rf.dataset.bound) { rf.dataset.bound = "1"; rf.onclick = () => loadCookieMonitors(); }
+  }
+
+  // ═══════════════════ Intracompany Data Transfer Agreement (DEMO) ═══════════════════
+  //
+  // Everything below is fabricated demo data. No API calls, no database access.
+  // The screen and the hub card both carry explicit DEMO labelling.
+
+  // Scope: 44 UN member states in the UN M49 "Europe" geographic region + Kosovo
+  // (geographic entry only — no implication of recognition). Türkiye, Cyprus,
+  // Georgia, Armenia and Azerbaijan are excluded (UN geoscheme places them in
+  // Western Asia). `signed: true` is invented.
+  const ICTA_COUNTRIES = [
+    { name: "Albania", flag: "🇦🇱", region: "Southern Europe", signed: true },
+    { name: "Andorra", flag: "🇦🇩", region: "Southern Europe", signed: true },
+    { name: "Austria", flag: "🇦🇹", region: "Western Europe", signed: true },
+    { name: "Belarus", flag: "🇧🇾", region: "Eastern Europe", signed: false },
+    { name: "Belgium", flag: "🇧🇪", region: "Western Europe", signed: true },
+    { name: "Bosnia and Herzegovina", flag: "🇧🇦", region: "Southern Europe", signed: false },
+    { name: "Bulgaria", flag: "🇧🇬", region: "Eastern Europe", signed: true },
+    { name: "Croatia", flag: "🇭🇷", region: "Southern Europe", signed: true },
+    { name: "Czechia", flag: "🇨🇿", region: "Eastern Europe", signed: true },
+    { name: "Denmark", flag: "🇩🇰", region: "Northern Europe", signed: true },
+    { name: "Estonia", flag: "🇪🇪", region: "Northern Europe", signed: true },
+    { name: "Finland", flag: "🇫🇮", region: "Northern Europe", signed: true },
+    { name: "France", flag: "🇫🇷", region: "Western Europe", signed: true },
+    { name: "Germany", flag: "🇩🇪", region: "Western Europe", signed: true },
+    { name: "Greece", flag: "🇬🇷", region: "Southern Europe", signed: true },
+    { name: "Hungary", flag: "🇭🇺", region: "Eastern Europe", signed: true },
+    { name: "Iceland", flag: "🇮🇸", region: "Northern Europe", signed: true },
+    { name: "Ireland", flag: "🇮🇪", region: "Northern Europe", signed: true },
+    { name: "Italy", flag: "🇮🇹", region: "Southern Europe", signed: true },
+    { name: "Kosovo", flag: "🇽🇰", region: "Southern Europe", signed: false },
+    { name: "Latvia", flag: "🇱🇻", region: "Northern Europe", signed: true },
+    { name: "Liechtenstein", flag: "🇱🇮", region: "Western Europe", signed: true },
+    { name: "Lithuania", flag: "🇱🇹", region: "Northern Europe", signed: true },
+    { name: "Luxembourg", flag: "🇱🇺", region: "Western Europe", signed: true },
+    { name: "Malta", flag: "🇲🇹", region: "Southern Europe", signed: true },
+    { name: "Moldova", flag: "🇲🇩", region: "Eastern Europe", signed: false },
+    { name: "Monaco", flag: "🇲🇨", region: "Western Europe", signed: true },
+    { name: "Montenegro", flag: "🇲🇪", region: "Southern Europe", signed: false },
+    { name: "Netherlands", flag: "🇳🇱", region: "Western Europe", signed: true },
+    { name: "North Macedonia", flag: "🇲🇰", region: "Southern Europe", signed: true },
+    { name: "Norway", flag: "🇳🇴", region: "Northern Europe", signed: true },
+    { name: "Poland", flag: "🇵🇱", region: "Eastern Europe", signed: true },
+    { name: "Portugal", flag: "🇵🇹", region: "Southern Europe", signed: true },
+    { name: "Romania", flag: "🇷🇴", region: "Eastern Europe", signed: true },
+    { name: "Russia", flag: "🇷🇺", region: "Eastern Europe", signed: false },
+    { name: "San Marino", flag: "🇸🇲", region: "Southern Europe", signed: true },
+    { name: "Serbia", flag: "🇷🇸", region: "Southern Europe", signed: false },
+    { name: "Slovakia", flag: "🇸🇰", region: "Eastern Europe", signed: true },
+    { name: "Slovenia", flag: "🇸🇮", region: "Southern Europe", signed: true },
+    { name: "Spain", flag: "🇪🇸", region: "Southern Europe", signed: true },
+    { name: "Sweden", flag: "🇸🇪", region: "Northern Europe", signed: true },
+    { name: "Switzerland", flag: "🇨🇭", region: "Western Europe", signed: true },
+    { name: "Ukraine", flag: "🇺🇦", region: "Eastern Europe", signed: false },
+    { name: "United Kingdom", flag: "🇬🇧", region: "Northern Europe", signed: true },
+    { name: "Vatican City", flag: "🇻🇦", region: "Southern Europe", signed: false },
+  ];
+
+  const ICTA_STATE = { q: "", status: "", region: "" };
+
+  function ictaFiltered() {
+    const q = ICTA_STATE.q.trim().toLowerCase();
+    return ICTA_COUNTRIES.filter((c) => {
+      if (q && !c.name.toLowerCase().includes(q)) return false;
+      if (ICTA_STATE.status === "signed" && !c.signed) return false;
+      if (ICTA_STATE.status === "pending" && c.signed) return false;
+      if (ICTA_STATE.region && c.region !== ICTA_STATE.region) return false;
+      return true;
+    });
+  }
+
+  function ictaStatsHtml() {
+    const total = ICTA_COUNTRIES.length;
+    const signed = ICTA_COUNTRIES.filter((c) => c.signed).length;
+    const pending = total - signed;
+    const pct = total ? Math.round((signed / total) * 100) : 0;
+    return `
+      <div class="icta-stat"><div class="num">${total}</div><div class="lbl">Countries</div><div class="sub">in demo scope</div></div>
+      <div class="icta-stat green"><div class="num">${signed}</div><div class="lbl">Signed</div><div class="sub">on file (demo)</div></div>
+      <div class="icta-stat amber"><div class="num">${pending}</div><div class="lbl">Pending</div><div class="sub">awaiting (demo)</div></div>
+      <div class="icta-stat purple">
+        <div class="num">${pct}%</div><div class="lbl">Coverage</div>
+        <div class="icta-progress" role="img" aria-label="${pct}% signed (demo)"><span style="width:${pct}%"></span></div>
+      </div>`;
+  }
+
+  function renderIcta() {
+    const grid = $("#icta-grid");
+    if (!grid) return;
+    const statsEl = $("#icta-stats");
+    if (statsEl && !statsEl.dataset.done) {
+      statsEl.innerHTML = ictaStatsHtml();
+      statsEl.dataset.done = "1";
+    }
+    const rows = ictaFiltered();
+    grid.innerHTML = rows.map((c) => `
+      <div class="icta-item">
+        <span class="flag" aria-hidden="true">${c.flag}</span>
+        <span class="nm"><b>${esc(c.name)}</b><span>${esc(c.region)}</span></span>
+        <span class="icta-status-pill ${c.signed ? "signed" : "pending"}">${c.signed ? "✓ Signed" : "Pending"}</span>
+      </div>`).join("");
+    $("#icta-empty").classList.toggle("hidden", rows.length > 0);
+    const cl = $("#icta-count-line");
+    if (cl) {
+      const chips = [];
+      if (ICTA_STATE.q) chips.push(`“${ICTA_STATE.q}”`);
+      if (ICTA_STATE.status) chips.push(ICTA_STATE.status);
+      if (ICTA_STATE.region) chips.push(ICTA_STATE.region);
+      cl.innerHTML = `Showing <b>${rows.length}</b> of ${ICTA_COUNTRIES.length} countries` +
+        (chips.length ? ` · filtered by ${esc(chips.join(" · "))}` : "") +
+        ` · <span class="muted">demo data</span>`;
+    }
+  }
+
+  function wireIcta() {
+    const s = $("#icta-search"), st = $("#icta-status"), rg = $("#icta-region"), rs = $("#icta-reset");
+    if (s && !s.dataset.bound) {
+      s.dataset.bound = "1";
+      let t = null;
+      s.oninput = () => {
+        clearTimeout(t);
+        t = setTimeout(() => { ICTA_STATE.q = s.value; renderIcta(); }, 120);
+      };
+    }
+    if (st && !st.dataset.bound) {
+      st.dataset.bound = "1";
+      st.onchange = () => { ICTA_STATE.status = st.value; renderIcta(); };
+    }
+    if (rg && !rg.dataset.bound) {
+      rg.dataset.bound = "1";
+      rg.onchange = () => { ICTA_STATE.region = rg.value; renderIcta(); };
+    }
+    if (rs && !rs.dataset.bound) {
+      rs.dataset.bound = "1";
+      rs.onclick = () => {
+        ICTA_STATE.q = ""; ICTA_STATE.status = ""; ICTA_STATE.region = "";
+        if (s) s.value = ""; if (st) st.value = ""; if (rg) rg.value = "";
+        renderIcta();
+      };
+    }
   }
 
   $("#ck-btn")?.addEventListener("click", runCookieScan);

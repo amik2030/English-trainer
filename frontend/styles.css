@@ -513,3 +513,47 @@ html[data-theme="light"] .seg-btn.active, html[data-theme="light"] .tab.active {
   background:var(--panel2);color:var(--muted)}
 .ck-signals .sig.ok{color:var(--green);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.10)}
 .ck-signals .sig.no{color:var(--red);border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.10)}
+
+/* ── Intracompany Data Transfer Agreement (DEMO) ─────────────────── */
+.icta-demo-banner{display:flex;gap:14px;align-items:flex-start;margin:14px 0 20px;padding:14px 16px;
+  border:1px dashed rgba(251,191,36,.55);border-radius:12px;background:rgba(251,191,36,.07);
+  font-size:13px;line-height:1.55;color:var(--text)}
+.icta-demo-banner .small{color:var(--muted);margin-top:3px}
+.icta-demo-tag{flex-shrink:0;font-size:11px;font-weight:800;letter-spacing:.10em;padding:4px 10px;border-radius:7px;
+  background:var(--amber);color:#1a1405}
+html[data-theme="light"] .icta-demo-tag{background:#986300;color:#fff}
+.icta-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:0 0 18px}
+.icta-stat{background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:14px 16px;position:relative;overflow:hidden}
+.icta-stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--blue)}
+.icta-stat.green::before{background:var(--green)}
+.icta-stat.amber::before{background:var(--amber)}
+.icta-stat.purple::before{background:var(--purple)}
+.icta-stat .num{font-size:26px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.icta-stat .lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+.icta-stat .sub{font-size:11px;color:var(--muted);margin-top:2px}
+.icta-progress{height:8px;border-radius:6px;background:var(--bg2);overflow:hidden;margin-top:9px}
+.icta-progress span{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--green),var(--blue))}
+.icta-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px;padding:10px 12px;
+  border:1px dashed var(--border);border-radius:12px;background:rgba(79,140,255,.04)}
+.icta-toolbar input,.icta-toolbar select{padding:7px 10px;border-radius:9px;border:1px solid var(--border);
+  background:var(--bg2);color:var(--text);font-size:13px;outline:none}
+.icta-toolbar input{flex:1;min-width:170px;max-width:280px}
+.icta-toolbar input:focus,.icta-toolbar select:focus{border-color:var(--blue)}
+.icta-count-line{font-size:12px;color:var(--muted);margin:0 0 14px}
+.icta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.icta-item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);
+  border-radius:12px;padding:12px 14px;transition:border-color .15s ease,transform .15s ease}
+.icta-item:hover{border-color:var(--blue);transform:translateY(-1px)}
+.icta-item .flag{font-size:19px;line-height:1;flex-shrink:0}
+.icta-item .nm{min-width:0;flex:1}
+.icta-item .nm b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icta-item .nm span{font-size:10.5px;color:var(--muted)}
+.icta-status-pill{flex-shrink:0;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.icta-status-pill.signed{color:var(--green);background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.4)}
+.icta-status-pill.pending{color:var(--amber);background:rgba(251,191,36,.13);border:1px solid rgba(251,191,36,.4)}
+.icta-empty{padding:26px;text-align:center;color:var(--muted);font-size:13px;border:1px dashed var(--border);border-radius:12px}
+.icta-footnote{margin-top:20px;padding:12px 14px;border-left:3px solid var(--border);border-radius:0 10px 10px 0;
+  background:var(--panel);font-size:11.5px;line-height:1.6;color:var(--muted)}
+.icta-footnote b{color:var(--text)}
+@media (max-width:640px){ .icta-grid{grid-template-columns:1fr 1fr} .icta-toolbar input{max-width:none} }
+@media (max-width:420px){ .icta-grid{grid-template-columns:1fr} }
