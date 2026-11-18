@@ -13,7 +13,7 @@
     document.documentElement.dataset.theme = "dark";
   }
 </script>
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=13">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
@@ -303,7 +303,15 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
     <section id="compliance" class="screen">
       <div class="eyebrow">Compliance tooling</div>
       <h1>Compliance Center</h1>
-      <p class="lede">Two screening modules that watch your web properties over time, plus a demo status board for intracompany transfer agreements. Screening scores are signals for human follow-up — not a legal opinion or a compliance determination.</p>
+      <p class="lede">Two screening modules that watch your web properties over time, plus a demo workspace for the annual affiliate privacy cycle. Screening scores are signals for human follow-up — not a legal opinion or a compliance determination.</p>
+      <div class="hub-strip">
+        <span class="hub-strip-label">Annual affiliate workstreams</span>
+        <span class="hub-strip-items">Intracompany Data Transfer Agreement</span>
+        <span class="hub-strip-sep" aria-hidden="true">·</span>
+        <span class="hub-strip-items">Privacy Maturity Self-Assessment</span>
+        <span class="hub-strip-sep" aria-hidden="true">·</span>
+        <span class="hub-strip-items">Privacy Compliance Declaration</span>
+      </div>
 
       <div class="hub-grid" id="hub-cards">
         <a class="hub-card" href="#compliance/notices">
@@ -324,61 +332,87 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
           </div>
           <div class="hub-go">Open module →</div>
         </a>
-        <a class="hub-card" href="#compliance/icta">
-          <div class="hub-icon">🌍</div>
+        <a class="hub-card hub-card-wide" href="#compliance/affiliates">
+          <div class="hub-icon">🗂️</div>
           <div class="hub-body">
             <span class="demo-pill">DEMO</span>
-            <h2>Intracompany Data Transfer Agreement</h2>
-            <p>Example status board across European countries showing which intracompany transfer agreements are on file. Illustrative sample data only — no real signatures or organization records.</p>
-            <div class="hub-kpis" id="hub-icta-kpis"><span class="muted small">Demo data</span></div>
+            <h2>Affiliate Privacy Assurance</h2>
+            <p>One annual cycle per affiliate legal entity: intracompany data transfer agreement, privacy maturity self-assessment, and privacy compliance declaration — three distinct statuses, one derived roll-up. Example data only; nothing here is a real agreement, assessment result, or declaration.</p>
+            <div class="hub-kpis" id="hub-affiliates-kpis"><span class="muted small">Demo data</span></div>
           </div>
-          <div class="hub-go">Open module →</div>
+          <div class="hub-go">Open workspace →</div>
         </a>
       </div>
 
-      <div class="aud-disclaimer" style="margin-top:18px">The notice and cookie modules are automated screening tools. They check text and markup patterns; they do not verify that a notice or banner is accurate, complete, or matches actual processing. The Intracompany Data Transfer Agreement card is a demo-only mock-up with fabricated data.</div>
+      <div class="aud-disclaimer" style="margin-top:18px">The notice and cookie modules are automated screening tools. They check text and markup patterns; they do not verify that a notice or banner is accurate, complete, or matches actual processing. The Affiliate Privacy Assurance card is a demo-only mock-up with fabricated data.</div>
     </section>
 
-    <!-- INTRACOMPANY DATA TRANSFER AGREEMENT (DEMO) -->
-    <section id="icta" class="screen">
-      <div class="crumb"><a href="#compliance">Compliance Center</a> <span>›</span> Intracompany Data Transfer Agreement</div>
+    <!-- AFFILIATE PRIVACY ASSURANCE (DEMO) -->
+    <section id="affiliates" class="screen">
+      <div class="crumb"><a href="#compliance">Compliance Center</a> <span>›</span> Affiliate Privacy Assurance</div>
       <div class="eyebrow">Compliance tooling</div>
-      <h1>Intracompany Data Transfer Agreement</h1>
-      <p class="lede">Example status board showing, per European country, whether an intracompany data transfer agreement is on file. <b>All data on this screen is fabricated for demonstration purposes.</b></p>
+      <h1>Affiliate Privacy Assurance</h1>
+      <p class="lede">One annual workspace that tracks the three affiliate privacy workstreams per legal entity: the intracompany data transfer agreement, the privacy maturity self-assessment, and the privacy compliance declaration. <b>All entities, statuses, scores and dates on this screen are fabricated for demonstration purposes.</b></p>
 
       <div class="icta-demo-banner" role="note">
         <div class="icta-demo-tag">DEMO</div>
         <div>
-          <b>Illustrative sample data — not real records.</b>
-          <div class="small">This screen is a front-end demonstration. Signatures, statuses and counts are invented to show the layout. It is not connected to any signing system, contains no organization data, and must not be read as evidence that any agreement exists or as a legal statement about any country.</div>
+          <b>Illustrative sample data — not real records, and “Complete” is not a compliance finding.</b>
+          <div class="small">This screen is a front-end demonstration with no backend behind it. “Complete” only means the cycle’s steps have been <i>recorded</i> for that entity. It is not evidence that an agreement is signed, that a maturity score is accurate, or that the entity is legally compliant. The maturity score is a <b>self-assessment</b>, not a certification or an audit. No agreement with any country or entity is implied.</div>
         </div>
       </div>
 
-      <div class="icta-stats" id="icta-stats"></div>
-
-      <div class="icta-toolbar">
-        <input id="icta-search" type="text" placeholder="Search country…" aria-label="Search country" autocomplete="off">
-        <select id="icta-status" aria-label="Filter by status">
-          <option value="">All statuses</option>
-          <option value="signed">Signed</option>
-          <option value="pending">Pending</option>
-        </select>
-        <select id="icta-region" aria-label="Filter by region">
-          <option value="">All regions</option>
-          <option value="Eastern Europe">Eastern Europe</option>
-          <option value="Northern Europe">Northern Europe</option>
-          <option value="Southern Europe">Southern Europe</option>
-          <option value="Western Europe">Western Europe</option>
-        </select>
-        <button class="btn small" id="icta-reset" type="button">Reset</button>
+      <div class="aff-cycle-bar">
+        <div class="aff-cycle-label">Cycle</div>
+        <div class="aff-cycle-tabs" id="aff-cycle-tabs" role="group" aria-label="Reporting cycle"></div>
+        <div class="aff-cycle-note muted small" id="aff-cycle-note"></div>
       </div>
 
-      <div class="icta-count-line" id="icta-count-line"></div>
-      <div class="icta-grid" id="icta-grid"></div>
-      <div class="icta-empty hidden" id="icta-empty">No countries match these filters.</div>
+      <div class="icta-stats aff-stats" id="aff-stats"></div>
+
+      <div class="aff-progress-grid" id="aff-progress"></div>
+
+      <div class="icta-toolbar aff-toolbar">
+        <input id="aff-search" type="text" placeholder="Search entity, country, ID…" aria-label="Search affiliates" autocomplete="off">
+        <select id="aff-region" aria-label="Filter by region">
+          <option value="">All regions</option>
+        </select>
+        <select id="aff-country" aria-label="Filter by country">
+          <option value="">All countries</option>
+        </select>
+        <select id="aff-overall" aria-label="Filter by overall status">
+          <option value="">All overall statuses</option>
+        </select>
+        <label class="aff-toggle">
+          <input type="checkbox" id="aff-attention">
+          <span>Needs attention only</span>
+        </label>
+        <button class="btn small" id="aff-reset" type="button">Reset</button>
+      </div>
+
+      <div class="icta-count-line" id="aff-count-line"></div>
+
+      <div class="aff-table" role="table" aria-label="Affiliates">
+        <div class="aff-thead" role="row">
+          <span role="columnheader">Entity</span>
+          <span role="columnheader">Country</span>
+          <span role="columnheader" class="aff-col-ws">Agreement</span>
+          <span role="columnheader" class="aff-col-ws">Assessment</span>
+          <span role="columnheader" class="aff-col-ws">Declaration</span>
+          <span role="columnheader" class="aff-col-overall">Overall</span>
+        </div>
+        <div id="aff-rows"></div>
+      </div>
+      <div class="icta-empty hidden" id="aff-empty">No affiliates match these filters.</div>
+
+      <div class="aff-section-head">
+        <h2>Country roll-up</h2>
+        <p class="muted small">Countries with more than one affiliate legal entity. Reporting rolls up per country; the workstreams are still tracked per entity.</p>
+      </div>
+      <div class="aff-rollup" id="aff-rollup"></div>
 
       <div class="icta-footnote">
-        <b>Scope of the demo country list.</b> 45 entries: the 44 UN member states in the UN M49 <i>Europe</i> geographic region, plus Kosovo. Transcontinental states classified elsewhere by the UN geoscheme (Türkiye, Cyprus, Georgia, Armenia, Azerbaijan) are not included. Kosovo is listed as a geographic entry only — inclusion does not imply recognition of statehood. Country list and all statuses are demo/geographic convention, not legal or political statements.
+        <b>What this demo does and does not show.</b> Entities, countries, regions, dates, scores, evidence labels and action items are invented sample data for layout purposes. The screen is not connected to any contract, HR, training or declaration system, and contains no organization data. Three workstream statuses are kept separate on purpose — the derived “overall” status is a convenience roll-up with its reason shown, never a substitute for the individual statuses. “Not applicable” for an agreement is a sample data value, not a legal conclusion for any jurisdiction. Country and region labels follow common geographic convention and are not legal or political statements.
       </div>
     </section>
 
@@ -522,6 +556,6 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
   </main>
 </div>
 
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>

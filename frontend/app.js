@@ -108,7 +108,7 @@
     TAX = await api("/api/taxonomy").catch(() => null);
     fillSourceFormSelects();
     wireNav();
-    wireIcta();
+    wireAff();
     await Promise.all([loadHistory(), loadSources(), ME.role === "reviewer" ? loadQueue() : Promise.resolve()]);
     // Honour a deep link (#compliance/cookies) on load, else show the default screen.
     const initial = routeFromHash();
@@ -123,12 +123,17 @@
     const parts = raw.split("/").filter(Boolean);
     if (parts[0] === "compliance" && parts[1] === "notices") return "auditor";
     if (parts[0] === "compliance" && parts[1] === "cookies") return "cookies";
-    if (parts[0] === "compliance" && parts[1] === "icta") return "icta";
+    // #compliance/affiliates is the unified annual affiliate workspace.
+    // #compliance/icta is kept as a backwards-compatible alias (old links/emails).
+    if (parts[0] === "compliance" && parts[1] === "affiliates") return "affiliates";
+    if (parts[0] === "compliance" && parts[1] === "icta") return "affiliates";
     const id = parts[0] || "ask";
     if (id === "compliance") return "compliance";
     if (id === "auditor") return "auditor";
     if (id === "cookies") return "cookies";
-    if (id === "icta") return "icta";
+    // #icta is the retired screen id; send legacy bookmarks to the new workspace.
+    if (id === "icta") return "affiliates";
+    if (id === "affiliates") return "affiliates";
     if (["ask", "kb", "sources", "review"].includes(id)) return id;
     return "ask";
   }
@@ -142,7 +147,7 @@
     if (id === "compliance") loadHub();
     if (id === "auditor") { loadAudits(); loadMonitors(); }
     if (id === "cookies") { loadCookieScans(); loadCookieMonitors(); }
-    if (id === "icta") renderIcta();
+    if (id === "affiliates") { normalizeAffiliateHash(); renderAff(); }
     if (id === "ask") { if (ASK_MODE === "chat") loadThreads(); else loadHistory(); }
   }
 
@@ -1307,13 +1312,14 @@
   async function loadHub() {
     const nEl = $("#hub-notices-kpis"), cEl = $("#hub-cookies-kpis");
     // Demo card KPIs are static — no backend involved.
-    const iEl = $("#hub-icta-kpis");
-    if (iEl) {
-      const total = ICTA_COUNTRIES.length;
-      const signed = ICTA_COUNTRIES.filter((c) => c.signed).length;
-      iEl.innerHTML = `<span><b>${total}</b> countries</span>
-        <span><b>${signed}</b> signed</span>
-        <span class="warn"><b>${total - signed}</b> pending</span>
+    const aEl = $("#hub-affiliates-kpis");
+    if (aEl) {
+      const k = affKpis(AFF.defaultCycle);
+      aEl.innerHTML = `<span><b>${k.entities}</b> affiliates</span>
+        <span><b>${k.agreementsCurrent}</b> agreements current</span>
+        <span><b>${k.assessmentsSubmitted}</b> assessments submitted</span>
+        <span><b>${k.declarationsSubmitted}</b> declarations submitted</span>
+        <span class="warn"><b>${k.attention}</b> need attention</span>
         <span class="muted">sample data</span>`;
     }
     if (!nEl && !cEl) return;
@@ -1616,143 +1622,672 @@
     if (rf && !rf.dataset.bound) { rf.dataset.bound = "1"; rf.onclick = () => loadCookieMonitors(); }
   }
 
-  // ═══════════════════ Intracompany Data Transfer Agreement (DEMO) ═══════════════════
+  // ═══════════════ Affiliate Privacy Assurance (DEMO) ═══════════════
   //
-  // Everything below is fabricated demo data. No API calls, no database access.
-  // The screen and the hub card both carry explicit DEMO labelling.
+  // One annual workspace per affiliate LEGAL ENTITY, with country as an
+  // attribute. Three workstreams are tracked separately and never collapsed:
+  //   1. Intracompany Data Transfer Agreement (ICTA)
+  //   2. Privacy Maturity Self-Assessment
+  //   3. Privacy Compliance Declaration
+  // A derived "overall" status is shown *with its reason*.
+  //
+  // Everything below is fabricated demo data. No API calls, no database access,
+  // no backend or schema involvement. The screen and hub card carry DEMO labels.
+  //
+  // "Complete" means the cycle's steps are recorded — NOT legal compliance.
+  // The maturity score is a self-assessment, not a certification.
 
-  // Scope: 44 UN member states in the UN M49 "Europe" geographic region + Kosovo
-  // (geographic entry only — no implication of recognition). Türkiye, Cyprus,
-  // Georgia, Armenia and Azerbaijan are excluded (UN geoscheme places them in
-  // Western Asia). `signed: true` is invented.
-  const ICTA_COUNTRIES = [
-    { name: "Albania", flag: "🇦🇱", region: "Southern Europe", signed: true },
-    { name: "Andorra", flag: "🇦🇩", region: "Southern Europe", signed: true },
-    { name: "Austria", flag: "🇦🇹", region: "Western Europe", signed: true },
-    { name: "Belarus", flag: "🇧🇾", region: "Eastern Europe", signed: false },
-    { name: "Belgium", flag: "🇧🇪", region: "Western Europe", signed: true },
-    { name: "Bosnia and Herzegovina", flag: "🇧🇦", region: "Southern Europe", signed: false },
-    { name: "Bulgaria", flag: "🇧🇬", region: "Eastern Europe", signed: true },
-    { name: "Croatia", flag: "🇭🇷", region: "Southern Europe", signed: true },
-    { name: "Czechia", flag: "🇨🇿", region: "Eastern Europe", signed: true },
-    { name: "Denmark", flag: "🇩🇰", region: "Northern Europe", signed: true },
-    { name: "Estonia", flag: "🇪🇪", region: "Northern Europe", signed: true },
-    { name: "Finland", flag: "🇫🇮", region: "Northern Europe", signed: true },
-    { name: "France", flag: "🇫🇷", region: "Western Europe", signed: true },
-    { name: "Germany", flag: "🇩🇪", region: "Western Europe", signed: true },
-    { name: "Greece", flag: "🇬🇷", region: "Southern Europe", signed: true },
-    { name: "Hungary", flag: "🇭🇺", region: "Eastern Europe", signed: true },
-    { name: "Iceland", flag: "🇮🇸", region: "Northern Europe", signed: true },
-    { name: "Ireland", flag: "🇮🇪", region: "Northern Europe", signed: true },
-    { name: "Italy", flag: "🇮🇹", region: "Southern Europe", signed: true },
-    { name: "Kosovo", flag: "🇽🇰", region: "Southern Europe", signed: false },
-    { name: "Latvia", flag: "🇱🇻", region: "Northern Europe", signed: true },
-    { name: "Liechtenstein", flag: "🇱🇮", region: "Western Europe", signed: true },
-    { name: "Lithuania", flag: "🇱🇹", region: "Northern Europe", signed: true },
-    { name: "Luxembourg", flag: "🇱🇺", region: "Western Europe", signed: true },
-    { name: "Malta", flag: "🇲🇹", region: "Southern Europe", signed: true },
-    { name: "Moldova", flag: "🇲🇩", region: "Eastern Europe", signed: false },
-    { name: "Monaco", flag: "🇲🇨", region: "Western Europe", signed: true },
-    { name: "Montenegro", flag: "🇲🇪", region: "Southern Europe", signed: false },
-    { name: "Netherlands", flag: "🇳🇱", region: "Western Europe", signed: true },
-    { name: "North Macedonia", flag: "🇲🇰", region: "Southern Europe", signed: true },
-    { name: "Norway", flag: "🇳🇴", region: "Northern Europe", signed: true },
-    { name: "Poland", flag: "🇵🇱", region: "Eastern Europe", signed: true },
-    { name: "Portugal", flag: "🇵🇹", region: "Southern Europe", signed: true },
-    { name: "Romania", flag: "🇷🇴", region: "Eastern Europe", signed: true },
-    { name: "Russia", flag: "🇷🇺", region: "Eastern Europe", signed: false },
-    { name: "San Marino", flag: "🇸🇲", region: "Southern Europe", signed: true },
-    { name: "Serbia", flag: "🇷🇸", region: "Southern Europe", signed: false },
-    { name: "Slovakia", flag: "🇸🇰", region: "Eastern Europe", signed: true },
-    { name: "Slovenia", flag: "🇸🇮", region: "Southern Europe", signed: true },
-    { name: "Spain", flag: "🇪🇸", region: "Southern Europe", signed: true },
-    { name: "Sweden", flag: "🇸🇪", region: "Northern Europe", signed: true },
-    { name: "Switzerland", flag: "🇨🇭", region: "Western Europe", signed: true },
-    { name: "Ukraine", flag: "🇺🇦", region: "Eastern Europe", signed: false },
-    { name: "United Kingdom", flag: "🇬🇧", region: "Northern Europe", signed: true },
-    { name: "Vatican City", flag: "🇻🇦", region: "Southern Europe", signed: false },
+  // ── Workstream vocabularies (kept distinct on purpose) ─────────────
+  const AFF_AGREEMENT = {
+    current:      { label: "Current",        tone: "green"  },
+    review_due:   { label: "Review due",     tone: "amber"  },
+    pending:      { label: "Pending",        tone: "amber"  },
+    not_applicable:{ label: "Not applicable", tone: "grey"  },
+  };
+  const AFF_ASSESSMENT = {
+    not_started: { label: "Not started", tone: "grey"  },
+    in_progress: { label: "In progress", tone: "blue"  },
+    submitted:   { label: "Submitted",   tone: "green" },
+    actions_open:{ label: "Actions open", tone: "amber" },
+  };
+  const AFF_DECLARATION = {
+    not_started:     { label: "Not started",     tone: "grey"   },
+    submitted:       { label: "Submitted",       tone: "green"  },
+    exceptions_noted:{ label: "Exceptions noted", tone: "purple" },
+  };
+
+  const AFF_CYCLES = [2025, 2026];
+  const AFF_DEFAULT_CYCLE = 2026;
+
+  // ── Sample entities ───────────────────────────────────────────────
+  // country: display name, region: reporting region, flag: emoji,
+  // cc: ISO-ish key used for grouping. Deliberately includes countries with
+  // more than one affiliate so the country roll-up has something to show.
+  const AFF_ENTITIES = [
+    // — multiple affiliates in one country —
+    { id: "DE-01", name: "Nordwind Analytics GmbH", short: "Nordwind Analytics", country: "Germany", cc: "DE", flag: "🇩🇪", region: "Western Europe", hq: "Berlin" },
+    { id: "DE-02", name: "Nordwind Labs GmbH", short: "Nordwind Labs", country: "Germany", cc: "DE", flag: "🇩🇪", region: "Western Europe", hq: "Munich" },
+    { id: "NL-01", name: "Delta Shelf B.V.", short: "Delta Shelf", country: "Netherlands", cc: "NL", flag: "🇳🇱", region: "Western Europe", hq: "Amsterdam" },
+    { id: "NL-02", name: "Delta Shelf Logistics B.V.", short: "Delta Shelf Logistics", country: "Netherlands", cc: "NL", flag: "🇳🇱", region: "Western Europe", hq: "Rotterdam" },
+
+    { id: "FR-01", name: "Atelier Rivage SAS", short: "Atelier Rivage", country: "France", cc: "FR", flag: "🇫🇷", region: "Western Europe", hq: "Lyon" },
+    { id: "ES-01", name: "Costa Verde Digital S.L.", short: "Costa Verde Digital", country: "Spain", cc: "ES", flag: "🇪🇸", region: "Southern Europe", hq: "Barcelona" },
+    { id: "IT-01", name: "Fiume Rete S.r.l.", short: "Fiume Rete", country: "Italy", cc: "IT", flag: "🇮🇹", region: "Southern Europe", hq: "Milan" },
+    { id: "PT-01", name: "Onda Clara Unipessoal Lda", short: "Onda Clara", country: "Portugal", cc: "PT", flag: "🇵🇹", region: "Southern Europe", hq: "Lisbon" },
+    { id: "IE-01", name: "Harbour Bridge Ltd", short: "Harbour Bridge", country: "Ireland", cc: "IE", flag: "🇮🇪", region: "Northern Europe", hq: "Dublin" },
+    { id: "SE-01", name: "Nordljus AB", short: "Nordljus", country: "Sweden", cc: "SE", flag: "🇸🇪", region: "Northern Europe", hq: "Stockholm" },
+    { id: "DK-01", name: "Klitrose ApS", short: "Klitrose", country: "Denmark", cc: "DK", flag: "🇩🇰", region: "Northern Europe", hq: "Copenhagen" },
+    { id: "FI-01", name: "Jääkaari Oy", short: "Jääkaari", country: "Finland", cc: "FI", flag: "🇫🇮", region: "Northern Europe", hq: "Helsinki" },
+    { id: "NO-01", name: "Fjellvid AS", short: "Fjellvid", country: "Norway", cc: "NO", flag: "🇳🇴", region: "Northern Europe", hq: "Oslo" },
+    { id: "PL-01", name: "Wisła Data Sp. z o.o.", short: "Wisła Data", country: "Poland", cc: "PL", flag: "🇵🇱", region: "Eastern Europe", hq: "Warsaw" },
+    { id: "CZ-01", name: "Vltava Systems s.r.o.", short: "Vltava Systems", country: "Czechia", cc: "CZ", flag: "🇨🇿", region: "Eastern Europe", hq: "Prague" },
+    { id: "AT-01", name: "Alpenrand GmbH", short: "Alpenrand", country: "Austria", cc: "AT", flag: "🇦🇹", region: "Western Europe", hq: "Vienna" },
+    { id: "CH-01", name: "Helvetia Klar AG", short: "Helvetia Klar", country: "Switzerland", cc: "CH", flag: "🇨🇭", region: "Western Europe", hq: "Zurich" },
+    { id: "BE-01", name: "Kanaal Tij BVBA", short: "Kanaal Tij", country: "Belgium", cc: "BE", flag: "🇧🇪", region: "Western Europe", hq: "Ghent" },
+    { id: "GR-01", name: "Aigaio Soft AE", short: "Aigaio Soft", country: "Greece", cc: "GR", flag: "🇬🇷", region: "Southern Europe", hq: "Athens" },
+    { id: "RO-01", name: "Carpat Cloud SRL", short: "Carpat Cloud", country: "Romania", cc: "RO", flag: "🇷🇴", region: "Eastern Europe", hq: "Cluj-Napoca" },
+    { id: "HU-01", name: "Duna Pixel Kft.", short: "Duna Pixel", country: "Hungary", cc: "HU", flag: "🇭🇺", region: "Eastern Europe", hq: "Budapest" },
+    { id: "GB-01", name: "Thames Ledger Ltd", short: "Thames Ledger", country: "United Kingdom", cc: "GB", flag: "🇬🇧", region: "Northern Europe", hq: "London" },
+    { id: "EE-01", name: "Balti Laine OÜ", short: "Balti Laine", country: "Estonia", cc: "EE", flag: "🇪🇪", region: "Northern Europe", hq: "Tallinn" },
+    { id: "SI-01", name: "Jadran Sistemi d.o.o.", short: "Jadran Sistemi", country: "Slovenia", cc: "SI", flag: "🇸🇮", region: "Southern Europe", hq: "Ljubljana" },
   ];
 
-  const ICTA_STATE = { q: "", status: "", region: "" };
+  // Per-cycle workstream state. Every row is invented. `agreement`/`assessment`/
+  // `declaration` hold the status key; the extra fields are the evidence, dates
+  // and action items surfaced in the detail panel. `history` holds prior years.
+  const AFF_CYCLES_DATA = {
+    2026: {
+      "DE-01": {
+        agreement: { status: "current", ref: "ICTA-DE-2026-014", signed: "2026-01-19", expires: "2027-01-18" },
+        assessment: { status: "actions_open", score: 74, submitted: "2026-02-06", band: "Managed", actions: [
+          { text: "Document retention schedule for marketing leads", tag: "open" },
+          { text: "Refresh DPIA for the analytics pipeline", tag: "open" },
+          { text: "Complete processor register for two new vendors", tag: "done" },
+        ] },
+        declaration: { status: "submitted", submitted: "2026-02-11", by: "A. Brandt (DPO)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "71 / Managed", declaration: "Submitted (v1.4)" }],
+      },
+      "DE-02": {
+        agreement: { status: "current", ref: "ICTA-DE-2026-014", signed: "2026-01-19", expires: "2027-01-18" },
+        assessment: { status: "submitted", score: 88, submitted: "2026-02-03", band: "Optimised", actions: [] },
+        declaration: { status: "submitted", submitted: "2026-02-09", by: "A. Brandt (DPO)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "85 / Optimised", declaration: "Submitted (v1.4)" }],
+      },
+      "NL-01": {
+        agreement: { status: "review_due", ref: "ICTA-NL-2025-003", signed: "2025-02-28", expires: "2026-02-27" },
+        assessment: { status: "in_progress", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "68 / Managed", declaration: "Submitted (v1.3)" }],
+      },
+      "NL-02": {
+        agreement: { status: "not_applicable", ref: null, signed: null, expires: null, why: "No intracompany transfer — local processing only (sample rationale)" },
+        assessment: { status: "submitted", score: 63, submitted: "2026-02-14", band: "Defined", actions: [] },
+        declaration: { status: "exceptions_noted", submitted: "2026-02-17", by: "M. de Vries (Counsel)", version: "v2.1", exceptions: 2, note: "Two sub-processor entries awaiting updated DPAs (sample)" },
+        history: [{ year: 2025, agreement: "Not applicable", assessment: "59 / Defined", declaration: "Exceptions noted (v1.3)" }],
+      },
+      "FR-01": {
+        agreement: { status: "current", ref: "ICTA-FR-2026-007", signed: "2026-01-08", expires: "2027-01-07" },
+        assessment: { status: "submitted", score: 81, submitted: "2026-02-05", band: "Managed", actions: [] },
+        declaration: { status: "submitted", submitted: "2026-02-12", by: "C. Moreau (DPO)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "77 / Managed", declaration: "Submitted (v1.4)" }],
+      },
+      "ES-01": {
+        agreement: { status: "pending", ref: null, signed: null, expires: null, why: "Awaiting countersignature on the 2026 schedule (sample)" },
+        assessment: { status: "in_progress", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [{ year: 2025, agreement: "Pending", assessment: "—", declaration: "Not started" }],
+      },
+      "IT-01": {
+        agreement: { status: "current", ref: "ICTA-IT-2026-005", signed: "2026-01-22", expires: "2027-01-21" },
+        assessment: { status: "actions_open", score: 57, submitted: "2026-02-10", band: "Defined", actions: [
+          { text: "Assign a named privacy owner for the entity", tag: "open" },
+          { text: "Run the annual awareness briefing", tag: "open" },
+        ] },
+        declaration: { status: "submitted", submitted: "2026-02-15", by: "G. Rinaldi (Legal)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Review due", assessment: "52 / Defined", declaration: "Submitted (v1.4)" }],
+      },
+      "PT-01": {
+        agreement: { status: "current", ref: "ICTA-PT-2026-002", signed: "2026-01-11", expires: "2027-01-10" },
+        assessment: { status: "not_started", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "61 / Defined", declaration: "Submitted (v1.3)" }],
+      },
+      "IE-01": {
+        agreement: { status: "current", ref: "ICTA-IE-2026-009", signed: "2026-01-05", expires: "2027-01-04" },
+        assessment: { status: "submitted", score: 91, submitted: "2026-02-02", band: "Optimised", actions: [] },
+        declaration: { status: "submitted", submitted: "2026-02-07", by: "S. O’Neill (DPO)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "89 / Optimised", declaration: "Submitted (v1.4)" }],
+      },
+      "SE-01": {
+        agreement: { status: "current", ref: "ICTA-SE-2026-006", signed: "2026-01-16", expires: "2027-01-15" },
+        assessment: { status: "submitted", score: 79, submitted: "2026-02-08", band: "Managed", actions: [] },
+        declaration: { status: "exceptions_noted", submitted: "2026-02-13", by: "E. Lind (Counsel)", version: "v2.1", exceptions: 1, note: "One transferred dataset missing a retention note (sample)" },
+        history: [{ year: 2025, agreement: "Current", assessment: "74 / Managed", declaration: "Submitted (v1.4)" }],
+      },
+      "DK-01": {
+        agreement: { status: "review_due", ref: "ICTA-DK-2025-011", signed: "2025-03-01", expires: "2026-02-28" },
+        assessment: { status: "submitted", score: 72, submitted: "2026-02-04", band: "Managed", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "70 / Managed", declaration: "Submitted (v1.3)" }],
+      },
+      "FI-01": {
+        agreement: { status: "current", ref: "ICTA-FI-2026-004", signed: "2026-01-27", expires: "2027-01-26" },
+        assessment: { status: "submitted", score: 84, submitted: "2026-02-09", band: "Optimised", actions: [] },
+        declaration: { status: "submitted", submitted: "2026-02-16", by: "L. Korhonen (DPO)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "80 / Managed", declaration: "Submitted (v1.4)" }],
+      },
+      "NO-01": {
+        agreement: { status: "not_applicable", ref: null, signed: null, expires: null, why: "Outside the intracompany transfer scope for this demo (sample)" },
+        assessment: { status: "actions_open", score: 66, submitted: "2026-02-12", band: "Defined", actions: [
+          { text: "Close the two open vendor assessments", tag: "open" },
+        ] },
+        declaration: { status: "submitted", submitted: "2026-02-18", by: "H. Dahl (Legal)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Not applicable", assessment: "63 / Defined", declaration: "Submitted (v1.3)" }],
+      },
+      "PL-01": {
+        agreement: { status: "pending", ref: null, signed: null, expires: null, why: "New entity — agreement in drafting (sample)" },
+        assessment: { status: "not_started", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [],
+      },
+      "CZ-01": {
+        agreement: { status: "current", ref: "ICTA-CZ-2026-008", signed: "2026-01-14", expires: "2027-01-13" },
+        assessment: { status: "submitted", score: 69, submitted: "2026-02-06", band: "Managed", actions: [] },
+        declaration: { status: "submitted", submitted: "2026-02-10", by: "P. Novák (DPO)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "64 / Defined", declaration: "Submitted (v1.3)" }],
+      },
+      "AT-01": {
+        agreement: { status: "current", ref: "ICTA-AT-2026-010", signed: "2026-01-20", expires: "2027-01-19" },
+        assessment: { status: "in_progress", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "76 / Managed", declaration: "Submitted (v1.4)" }],
+      },
+      "CH-01": {
+        agreement: { status: "current", ref: "ICTA-CH-2026-012", signed: "2026-01-23", expires: "2027-01-22" },
+        assessment: { status: "submitted", score: 86, submitted: "2026-02-07", band: "Optimised", actions: [] },
+        declaration: { status: "submitted", submitted: "2026-02-14", by: "R. Meier (DPO)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "83 / Optimised", declaration: "Submitted (v1.4)" }],
+      },
+      "BE-01": {
+        agreement: { status: "review_due", ref: "ICTA-BE-2025-002", signed: "2025-02-15", expires: "2026-02-14" },
+        assessment: { status: "actions_open", score: 54, submitted: "2026-02-11", band: "Initial", actions: [
+          { text: "Adopt a written retention policy", tag: "open" },
+          { text: "Record the processor onboarding checklist", tag: "open" },
+          { text: "Appoint an entity-level privacy contact", tag: "open" },
+        ] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "49 / Initial", declaration: "Submitted (v1.3)" }],
+      },
+      "GR-01": {
+        agreement: { status: "pending", ref: null, signed: null, expires: null, why: "Local counsel review outstanding (sample)" },
+        assessment: { status: "in_progress", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [{ year: 2025, agreement: "Pending", assessment: "—", declaration: "Not started" }],
+      },
+      "RO-01": {
+        agreement: { status: "current", ref: "ICTA-RO-2026-013", signed: "2026-01-29", expires: "2027-01-28" },
+        assessment: { status: "submitted", score: 61, submitted: "2026-02-13", band: "Defined", actions: [] },
+        declaration: { status: "exceptions_noted", submitted: "2026-02-19", by: "I. Popescu (Legal)", version: "v2.1", exceptions: 1, note: "One cross-border transfer awaiting an updated annex (sample)" },
+        history: [{ year: 2025, agreement: "Current", assessment: "58 / Defined", declaration: "Submitted (v1.3)" }],
+      },
+      "HU-01": {
+        agreement: { status: "current", ref: "ICTA-HU-2026-015", signed: "2026-01-31", expires: "2027-01-30" },
+        assessment: { status: "not_started", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "55 / Defined", declaration: "Submitted (v1.3)" }],
+      },
+      "GB-01": {
+        agreement: { status: "current", ref: "ICTA-GB-2026-001", signed: "2026-01-06", expires: "2027-01-05" },
+        assessment: { status: "submitted", score: 93, submitted: "2026-02-01", band: "Optimised", actions: [] },
+        declaration: { status: "submitted", submitted: "2026-02-06", by: "J. Whitfield (DPO)", version: "v2.1", exceptions: 0 },
+        history: [{ year: 2025, agreement: "Current", assessment: "90 / Optimised", declaration: "Submitted (v1.4)" }],
+      },
+      "EE-01": {
+        agreement: { status: "current", ref: "ICTA-EE-2026-016", signed: "2026-02-02", expires: "2027-02-01" },
+        assessment: { status: "in_progress", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [],
+      },
+      "SI-01": {
+        agreement: { status: "current", ref: "ICTA-SI-2026-017", signed: "2026-02-04", expires: "2027-02-03" },
+        assessment: { status: "submitted", score: 76, submitted: "2026-02-15", band: "Managed", actions: [] },
+        declaration: { status: "submitted", submitted: "2026-02-20", by: "N. Zupan (DPO)", version: "v2.1", exceptions: 0 },
+        history: [],
+      },
+    },
+    // Prior cycle — kept partial on purpose so the year selector has a visibly
+    // different (mostly older) picture, and the detail history has something to show.
+    2025: {
+      "DE-01": { agreement: { status: "current", ref: "ICTA-DE-2025-014", signed: "2025-01-20", expires: "2026-01-19" }, assessment: { status: "submitted", score: 71, submitted: "2025-02-07", band: "Managed", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-12", by: "A. Brandt (DPO)", version: "v1.4", exceptions: 0 }, history: [] },
+      "DE-02": { agreement: { status: "current", ref: "ICTA-DE-2025-014", signed: "2025-01-20", expires: "2026-01-19" }, assessment: { status: "submitted", score: 85, submitted: "2025-02-04", band: "Optimised", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-10", by: "A. Brandt (DPO)", version: "v1.4", exceptions: 0 }, history: [] },
+      "NL-01": { agreement: { status: "current", ref: "ICTA-NL-2025-003", signed: "2025-02-28", expires: "2026-02-27" }, assessment: { status: "submitted", score: 68, submitted: "2025-03-05", band: "Managed", actions: [] }, declaration: { status: "submitted", submitted: "2025-03-11", by: "M. de Vries (Counsel)", version: "v1.3", exceptions: 0 }, history: [] },
+      "NL-02": { agreement: { status: "not_applicable", ref: null, signed: null, expires: null, why: "No intracompany transfer — local processing only (sample rationale)" }, assessment: { status: "submitted", score: 59, submitted: "2025-03-06", band: "Defined", actions: [] }, declaration: { status: "exceptions_noted", submitted: "2025-03-12", by: "M. de Vries (Counsel)", version: "v1.3", exceptions: 1, note: "One sub-processor DPA was pending (sample)" }, history: [] },
+      "FR-01": { agreement: { status: "current", ref: "ICTA-FR-2025-007", signed: "2025-01-09", expires: "2026-01-08" }, assessment: { status: "submitted", score: 77, submitted: "2025-02-06", band: "Managed", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-13", by: "C. Moreau (DPO)", version: "v1.4", exceptions: 0 }, history: [] },
+      "ES-01": { agreement: { status: "pending", ref: null, signed: null, expires: null, why: "Countersignature outstanding (sample)" }, assessment: { status: "not_started", score: null, submitted: null, band: "—", actions: [] }, declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 }, history: [] },
+      "IT-01": { agreement: { status: "review_due", ref: "ICTA-IT-2024-005", signed: "2024-01-25", expires: "2025-01-24" }, assessment: { status: "submitted", score: 52, submitted: "2025-02-11", band: "Defined", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-16", by: "G. Rinaldi (Legal)", version: "v1.4", exceptions: 0 }, history: [] },
+      "PT-01": { agreement: { status: "current", ref: "ICTA-PT-2025-002", signed: "2025-01-12", expires: "2026-01-11" }, assessment: { status: "submitted", score: 61, submitted: "2025-02-08", band: "Defined", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-14", by: "R. Alves (Legal)", version: "v1.3", exceptions: 0 }, history: [] },
+      "IE-01": { agreement: { status: "current", ref: "ICTA-IE-2025-009", signed: "2025-01-06", expires: "2026-01-05" }, assessment: { status: "submitted", score: 89, submitted: "2025-02-03", band: "Optimised", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-08", by: "S. O’Neill (DPO)", version: "v1.4", exceptions: 0 }, history: [] },
+      "SE-01": { agreement: { status: "current", ref: "ICTA-SE-2025-006", signed: "2025-01-17", expires: "2026-01-16" }, assessment: { status: "submitted", score: 74, submitted: "2025-02-09", band: "Managed", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-14", by: "E. Lind (Counsel)", version: "v1.4", exceptions: 0 }, history: [] },
+      "DK-01": { agreement: { status: "current", ref: "ICTA-DK-2025-011", signed: "2025-03-01", expires: "2026-02-28" }, assessment: { status: "submitted", score: 70, submitted: "2025-03-04", band: "Managed", actions: [] }, declaration: { status: "submitted", submitted: "2025-03-10", by: "F. Sørensen (Legal)", version: "v1.3", exceptions: 0 }, history: [] },
+      "FI-01": { agreement: { status: "current", ref: "ICTA-FI-2025-004", signed: "2025-01-28", expires: "2026-01-27" }, assessment: { status: "submitted", score: 80, submitted: "2025-02-10", band: "Managed", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-17", by: "L. Korhonen (DPO)", version: "v1.4", exceptions: 0 }, history: [] },
+      "NO-01": { agreement: { status: "not_applicable", ref: null, signed: null, expires: null, why: "Outside the intracompany transfer scope for this demo (sample)" }, assessment: { status: "submitted", score: 63, submitted: "2025-02-13", band: "Defined", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-19", by: "H. Dahl (Legal)", version: "v1.3", exceptions: 0 }, history: [] },
+      "PL-01": { agreement: { status: "pending", ref: null, signed: null, expires: null, why: "Entity onboarding in progress (sample)" }, assessment: { status: "not_started", score: null, submitted: null, band: "—", actions: [] }, declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 }, history: [] },
+      "CZ-01": { agreement: { status: "current", ref: "ICTA-CZ-2025-008", signed: "2025-01-15", expires: "2026-01-14" }, assessment: { status: "submitted", score: 64, submitted: "2025-02-07", band: "Defined", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-11", by: "P. Novák (DPO)", version: "v1.3", exceptions: 0 }, history: [] },
+      "AT-01": { agreement: { status: "current", ref: "ICTA-AT-2025-010", signed: "2025-01-21", expires: "2026-01-20" }, assessment: { status: "submitted", score: 76, submitted: "2025-02-08", band: "Managed", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-15", by: "K. Huber (Legal)", version: "v1.4", exceptions: 0 }, history: [] },
+      "CH-01": { agreement: { status: "current", ref: "ICTA-CH-2025-012", signed: "2025-01-24", expires: "2026-01-23" }, assessment: { status: "submitted", score: 83, submitted: "2025-02-08", band: "Optimised", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-15", by: "R. Meier (DPO)", version: "v1.4", exceptions: 0 }, history: [] },
+      "BE-01": { agreement: { status: "current", ref: "ICTA-BE-2025-002", signed: "2025-02-15", expires: "2026-02-14" }, assessment: { status: "submitted", score: 49, submitted: "2025-02-20", band: "Initial", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-26", by: "T. Claes (Legal)", version: "v1.3", exceptions: 0 }, history: [] },
+      "GR-01": { agreement: { status: "pending", ref: null, signed: null, expires: null, why: "Local counsel review outstanding (sample)" }, assessment: { status: "not_started", score: null, submitted: null, band: "—", actions: [] }, declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 }, history: [] },
+      "RO-01": { agreement: { status: "current", ref: "ICTA-RO-2025-013", signed: "2025-01-30", expires: "2026-01-29" }, assessment: { status: "submitted", score: 58, submitted: "2025-02-14", band: "Defined", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-20", by: "I. Popescu (Legal)", version: "v1.3", exceptions: 0 }, history: [] },
+      "HU-01": { agreement: { status: "current", ref: "ICTA-HU-2025-015", signed: "2025-02-01", expires: "2026-01-31" }, assessment: { status: "submitted", score: 55, submitted: "2025-02-12", band: "Defined", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-18", by: "B. Nagy (Legal)", version: "v1.3", exceptions: 0 }, history: [] },
+      "GB-01": { agreement: { status: "current", ref: "ICTA-GB-2025-001", signed: "2025-01-07", expires: "2026-01-06" }, assessment: { status: "submitted", score: 90, submitted: "2025-02-02", band: "Optimised", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-07", by: "J. Whitfield (DPO)", version: "v1.4", exceptions: 0 }, history: [] },
+      "EE-01": { agreement: { status: "pending", ref: null, signed: null, expires: null, why: "Entity formed late in the cycle (sample)" }, assessment: { status: "not_started", score: null, submitted: null, band: "—", actions: [] }, declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 }, history: [] },
+      "SI-01": { agreement: { status: "current", ref: "ICTA-SI-2025-017", signed: "2025-02-05", expires: "2026-02-04" }, assessment: { status: "submitted", score: 72, submitted: "2025-02-16", band: "Managed", actions: [] }, declaration: { status: "submitted", submitted: "2025-02-21", by: "N. Zupan (DPO)", version: "v1.3", exceptions: 0 }, history: [] },
+    },
+  };
+  AFF_ENTITIES.forEach((e) => {
+    if (!AFF_CYCLES_DATA[2025][e.id]) {
+      AFF_CYCLES_DATA[2025][e.id] = {
+        agreement: { status: "pending", ref: null, signed: null, expires: null, why: "Sample placeholder for a prior cycle" },
+        assessment: { status: "not_started", score: null, submitted: null, band: "—", actions: [] },
+        declaration: { status: "not_started", submitted: null, by: null, version: null, exceptions: 0 },
+        history: [],
+      };
+    }
+  });
 
-  function ictaFiltered() {
-    const q = ICTA_STATE.q.trim().toLowerCase();
-    return ICTA_COUNTRIES.filter((c) => {
-      if (q && !c.name.toLowerCase().includes(q)) return false;
-      if (ICTA_STATE.status === "signed" && !c.signed) return false;
-      if (ICTA_STATE.status === "pending" && c.signed) return false;
-      if (ICTA_STATE.region && c.region !== ICTA_STATE.region) return false;
+  const AFF = {
+    cycles: AFF_CYCLES,
+    defaultCycle: AFF_DEFAULT_CYCLE,
+    entities: AFF_ENTITIES,
+    byId: Object.fromEntries(AFF_ENTITIES.map((e) => [e.id, e])),
+    data: AFF_CYCLES_DATA,
+    state: { cycle: AFF_DEFAULT_CYCLE, q: "", region: "", country: "", overall: "", attention: false, open: "" },
+  };
+
+  // ── Derived helpers ───────────────────────────────────────────────
+  function affRow(entity, cycle) {
+    const d = (AFF.data[cycle] || AFF.data[AFF.defaultCycle])[entity.id];
+    return { ...entity, ...d };
+  }
+
+  function affRows(cycle) {
+    return AFF.entities.map((e) => affRow(e, cycle));
+  }
+
+  // Attention reasons — explicit, in priority order. An entity "needs attention"
+  // when any workstream is unfinished or carries open actions/exceptions.
+  function affAttention(row) {
+    const r = [];
+    if (row.agreement.status === "pending") r.push("agreement pending");
+    if (row.agreement.status === "review_due") r.push("agreement review due");
+    if (row.assessment.status === "actions_open") r.push("assessment actions open");
+    if (row.assessment.status === "not_started") r.push("assessment not started");
+    if (row.assessment.status === "in_progress") r.push("assessment in progress");
+    if (row.declaration.status === "not_started") r.push("declaration not started");
+    if (row.declaration.status === "exceptions_noted") r.push("declaration exceptions");
+    return r;
+  }
+
+  // Overall is DERIVED, never stored. The reason string is always shown so the
+  // roll-up can't be mistaken for one of the three real statuses.
+  function affOverall(row) {
+    const a = row.agreement.status, s = row.assessment.status, d = row.declaration.status;
+    const complete = (a === "current" || a === "not_applicable") && s === "submitted" && d === "submitted";
+    if (complete) return { key: "complete", label: "Complete", tone: "green", why: "all three steps recorded" };
+    // "Pending" and "Review due" are recorded agreement states — the cycle has
+    // begun for the entity even when the other two steps are untouched.
+    const started = s !== "not_started" || d !== "not_started" || a !== "not_applicable";
+    if (!started) return { key: "not_started", label: "Not started", tone: "grey", why: "no steps recorded yet" };
+    const why = affAttention(row).slice(0, 2).join("; ");
+    return { key: "in_progress", label: "In progress", tone: "amber", why: why || "steps outstanding" };
+  }
+
+  function affKpis(cycle) {
+    const rows = affRows(cycle);
+    return {
+      entities: rows.length,
+      agreementsCurrent: rows.filter((r) => r.agreement.status === "current").length,
+      assessmentsSubmitted: rows.filter((r) => r.assessment.status === "submitted" || r.assessment.status === "actions_open").length,
+      declarationsSubmitted: rows.filter((r) => r.declaration.status === "submitted" || r.declaration.status === "exceptions_noted").length,
+      attention: rows.filter((r) => affAttention(r).length > 0).length,
+      complete: rows.filter((r) => affOverall(r).key === "complete").length,
+    };
+  }
+
+  function affFiltered() {
+    const S = AFF.state;
+    const q = S.q.trim().toLowerCase();
+    return affRows(S.cycle).filter((r) => {
+      if (q) {
+        const hay = `${r.name} ${r.short} ${r.id} ${r.country} ${r.hq} ${r.region}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (S.region && r.region !== S.region) return false;
+      if (S.country && r.cc !== S.country) return false;
+      if (S.overall) {
+        const o = affOverall(r);
+        const hit = S.overall === "attention" ? affAttention(r).length > 0 : o.key === S.overall;
+        if (!hit) return false;
+      }
+      if (S.attention && !affAttention(r).length) return false;
       return true;
     });
   }
 
-  function ictaStatsHtml() {
-    const total = ICTA_COUNTRIES.length;
-    const signed = ICTA_COUNTRIES.filter((c) => c.signed).length;
-    const pending = total - signed;
-    const pct = total ? Math.round((signed / total) * 100) : 0;
-    return `
-      <div class="icta-stat"><div class="num">${total}</div><div class="lbl">Countries</div><div class="sub">in demo scope</div></div>
-      <div class="icta-stat green"><div class="num">${signed}</div><div class="lbl">Signed</div><div class="sub">on file (demo)</div></div>
-      <div class="icta-stat amber"><div class="num">${pending}</div><div class="lbl">Pending</div><div class="sub">awaiting (demo)</div></div>
-      <div class="icta-stat purple">
-        <div class="num">${pct}%</div><div class="lbl">Coverage</div>
-        <div class="icta-progress" role="img" aria-label="${pct}% signed (demo)"><span style="width:${pct}%"></span></div>
-      </div>`;
+  function affCountryName(cc) {
+    const e = AFF.entities.find((x) => x.cc === cc);
+    return e ? e.country : cc;
   }
 
-  function renderIcta() {
-    const grid = $("#icta-grid");
-    if (!grid) return;
-    const statsEl = $("#icta-stats");
-    if (statsEl && !statsEl.dataset.done) {
-      statsEl.innerHTML = ictaStatsHtml();
-      statsEl.dataset.done = "1";
+  function affPill(vocab, key) {
+    const v = vocab[key] || { label: key, tone: "grey" };
+    return `<span class="aff-pill ${v.tone}">${esc(v.label)}</span>`;
+  }
+
+  function affOverallPill(o) {
+    return `<span class="aff-pill ${o.tone}" title="${esc(o.why)}"><span class="dot"></span>${esc(o.label)}` +
+      `<span class="why">· ${esc(o.why)}</span></span>`;
+  }
+
+  // ── Render: KPIs + progress bars ──────────────────────────────────
+  function affStatsHtml() {
+    const k = affKpis(AFF.state.cycle);
+    const pct = (n) => (k.entities ? Math.round((n / k.entities) * 100) : 0);
+    return `
+      <div class="icta-stat"><div class="num">${k.entities}</div><div class="lbl">Affiliates</div><div class="sub">legal entities (demo)</div></div>
+      <div class="icta-stat green"><div class="num">${k.agreementsCurrent}</div><div class="lbl">Agreements current</div><div class="sub">${pct(k.agreementsCurrent)}% of entities</div></div>
+      <div class="icta-stat green"><div class="num">${k.assessmentsSubmitted}</div><div class="lbl">Assessments submitted</div><div class="sub">${pct(k.assessmentsSubmitted)}% of entities</div></div>
+      <div class="icta-stat purple"><div class="num">${k.declarationsSubmitted}</div><div class="lbl">Declarations submitted</div><div class="sub">${pct(k.declarationsSubmitted)}% of entities</div></div>
+      <div class="icta-stat amber"><div class="num">${k.attention}</div><div class="lbl">Needs attention</div><div class="sub">any workstream outstanding</div></div>`;
+  }
+
+  function affProgressHtml() {
+    const rows = affRows(AFF.state.cycle);
+    const n = rows.length || 1;
+    const cur = rows.filter((r) => r.agreement.status === "current").length;
+    const sub = rows.filter((r) => r.assessment.status === "submitted" || r.assessment.status === "actions_open").length;
+    const dec = rows.filter((r) => r.declaration.status === "submitted" || r.declaration.status === "exceptions_noted").length;
+    const bar = (cls, label, val, sub2) => {
+      const p = Math.round((val / n) * 100);
+      return `<div class="aff-progress ${cls}">
+        <div class="aph"><b>${label}</b><span>${val}/${rows.length} · ${p}%</span></div>
+        <div class="bar" role="img" aria-label="${label}: ${val} of ${rows.length} (${p}%)"><i style="width:${p}%"></i></div>
+        <div class="aps">${sub2}</div>
+      </div>`;
+    };
+    return bar("", "Agreements current", cur, "Signed and in date for the cycle") +
+      bar("assess", "Assessments submitted", sub, "Submitted, with or without open actions") +
+      bar("decl", "Declarations submitted", dec, "Submitted, with or without exceptions");
+  }
+
+  // ── Render: filters ───────────────────────────────────────────────
+  function affFillFilters() {
+    const regionSel = $("#aff-region"), countrySel = $("#aff-country"), overallSel = $("#aff-overall");
+    if (regionSel && !regionSel.dataset.filled) {
+      const regions = [...new Set(AFF.entities.map((e) => e.region))].sort();
+      regionSel.innerHTML = '<option value="">All regions</option>' +
+        regions.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
+      regionSel.dataset.filled = "1";
     }
-    const rows = ictaFiltered();
-    grid.innerHTML = rows.map((c) => `
-      <div class="icta-item">
-        <span class="flag" aria-hidden="true">${c.flag}</span>
-        <span class="nm"><b>${esc(c.name)}</b><span>${esc(c.region)}</span></span>
-        <span class="icta-status-pill ${c.signed ? "signed" : "pending"}">${c.signed ? "✓ Signed" : "Pending"}</span>
-      </div>`).join("");
-    $("#icta-empty").classList.toggle("hidden", rows.length > 0);
-    const cl = $("#icta-count-line");
+    if (countrySel && !countrySel.dataset.filled) {
+      const seen = new Map();
+      AFF.entities.forEach((e) => { if (!seen.has(e.cc)) seen.set(e.cc, e); });
+      const opts = [...seen.values()].sort((a, b) => a.country.localeCompare(b.country));
+      countrySel.innerHTML = '<option value="">All countries</option>' +
+        opts.map((e) => `<option value="${esc(e.cc)}">${esc(e.flag)} ${esc(e.country)}</option>`).join("");
+      countrySel.dataset.filled = "1";
+    }
+    if (overallSel && !overallSel.dataset.filled) {
+      overallSel.innerHTML = '<option value="">All overall statuses</option>' +
+        '<option value="complete">Complete</option>' +
+        '<option value="in_progress">In progress</option>' +
+        '<option value="not_started">Not started</option>' +
+        '<option value="attention">Needs attention</option>';
+      overallSel.dataset.filled = "1";
+    }
+  }
+
+  // ── Render: cycle selector ────────────────────────────────────────
+  function affCycleHtml() {
+    return AFF.cycles.map((y) =>
+      `<button type="button" data-cycle="${y}" aria-pressed="${y === AFF.state.cycle}">${y}</button>`).join("");
+  }
+
+  // ── Render: table ─────────────────────────────────────────────────
+  function affRowsHtml(rows) {
+    if (!rows.length) return "";
+    return rows.map((r) => {
+      const o = affOverall(r);
+      const open = AFF.state.open === r.id;
+      const detail = open ? affDetailHtml(r) : "";
+      return `<div class="aff-row${open ? " open" : ""}" data-id="${esc(r.id)}">
+        <div class="aff-row-main" role="row" tabindex="0" aria-expanded="${open}" data-toggle="${esc(r.id)}">
+          <span class="aff-ent" role="cell">
+            <span class="aff-chev" aria-hidden="true">▶</span>
+            <span class="nm"><b>${esc(r.short)}</b><span>${esc(r.id)} · ${esc(r.hq)}</span></span>
+          </span>
+          <span class="aff-ctry" role="cell">
+            <span class="flag" aria-hidden="true">${r.flag}</span>
+            <span class="cn"><b>${esc(r.country)}</b><span>${esc(r.region)}</span></span>
+          </span>
+          <span class="aff-col-ws" role="cell">${affPill(AFF_AGREEMENT, r.agreement.status)}</span>
+          <span class="aff-col-ws" role="cell">${affPill(AFF_ASSESSMENT, r.assessment.status)}</span>
+          <span class="aff-col-ws" role="cell">${affPill(AFF_DECLARATION, r.declaration.status)}</span>
+          <span class="aff-col-overall" role="cell">${affOverallPill(o)}</span>
+        </div>
+        ${detail}
+      </div>`;
+    }).join("");
+  }
+
+  function affWsAgreement(r) {
+    const a = r.agreement;
+    if (a.status === "not_applicable") {
+      return `<div class="aff-ws"><h4>1 · Transfer agreement</h4>
+        <div class="kv"><span>Status</span><b>${affPill(AFF_AGREEMENT, a.status)}</b></div>
+        <div class="ev"><b>Why recorded as N/A:</b> ${esc(a.why || "Sample rationale")}</div></div>`;
+    }
+    return `<div class="aff-ws"><h4>1 · Transfer agreement</h4>
+      <div class="kv"><span>Status</span><b>${affPill(AFF_AGREEMENT, a.status)}</b></div>
+      <div class="kv"><span>Reference</span><b>${esc(a.ref || "—")}</b></div>
+      <div class="kv"><span>Signed</span><b>${esc(a.signed || "—")}</b></div>
+      <div class="kv"><span>Expires</span><b>${esc(a.expires || "—")}</b></div>
+      ${a.why ? `<div class="ev"><b>Note:</b> ${esc(a.why)}</div>` : ""}</div>`;
+  }
+
+  function affWsAssessment(r) {
+    const s = r.assessment;
+    const score = s.score == null ? "—" : `${s.score}<span class="muted small"> / 100 self-assessed</span>`;
+    const acts = (s.actions || []).map((a) =>
+      `<li><span class="tag ${a.tag === "done" ? "done" : ""}">${a.tag === "done" ? "done" : "open"}</span><span>${esc(a.text)}</span></li>`).join("");
+    return `<div class="aff-ws"><h4>2 · Maturity self-assessment</h4>
+      <div class="kv"><span>Status</span><b>${affPill(AFF_ASSESSMENT, s.status)}</b></div>
+      <div class="kv"><span>Score</span><b>${score}</b></div>
+      <div class="kv"><span>Band</span><b>${esc(s.band || "—")}</b></div>
+      <div class="kv"><span>Submitted</span><b>${esc(s.submitted || "—")}</b></div>
+      ${acts ? `<div class="ev"><b>Action items</b></div><ul class="aff-actions">${acts}</ul>` : `<div class="ev">No open action items recorded.</div>`}
+      <div class="aff-note">Self-reported questionnaire result — not a certification or audit opinion.</div></div>`;
+  }
+
+  function affWsDeclaration(r) {
+    const d = r.declaration;
+    return `<div class="aff-ws"><h4>3 · Compliance declaration</h4>
+      <div class="kv"><span>Status</span><b>${affPill(AFF_DECLARATION, d.status)}</b></div>
+      <div class="kv"><span>Version</span><b>${esc(d.version || "—")}</b></div>
+      <div class="kv"><span>Submitted</span><b>${esc(d.submitted || "—")}</b></div>
+      <div class="kv"><span>Submitted by</span><b>${esc(d.by || "—")}</b></div>
+      <div class="kv"><span>Exceptions</span><b>${d.exceptions || 0}</b></div>
+      ${d.note ? `<div class="ev"><b>Exception note:</b> ${esc(d.note)}</div>` : ""}</div>`;
+  }
+
+  function affHistoryHtml(r) {
+    const hist = r.history || [];
+    if (!hist.length) return `<div class="aff-hist"><div class="muted small">No prior-year history recorded for this entity (demo).</div></div>`;
+    return `<div class="aff-hist"><table>
+      <thead><tr><th>Cycle</th><th>Agreement</th><th>Assessment</th><th>Declaration</th></tr></thead>
+      <tbody>${hist.map((h) => `<tr><td>${h.year}</td><td>${esc(h.agreement)}</td><td>${esc(h.assessment)}</td><td>${esc(h.declaration)}</td></tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+
+  function affDetailHtml(r) {
+    const o = affOverall(r);
+    const att = affAttention(r);
+    return `<div class="aff-detail-wrap">
+      <div class="aff-ws-grid">
+        ${affWsAgreement(r)}
+        ${affWsAssessment(r)}
+        ${affWsDeclaration(r)}
+      </div>
+      <div class="aff-ws" style="margin-top:12px">
+        <h4>Derived overall — ${esc(o.label)}</h4>
+        <div class="kv"><span>Reason</span><b>${esc(o.why)}</b></div>
+        <div class="kv"><span>Open points</span><b>${att.length ? esc(att.join("; ")) : "none"}</b></div>
+        <div class="aff-note">Derived from the three workstream statuses above — not a stored field and not a compliance determination.</div>
+      </div>
+      ${affHistoryHtml(r)}
+      <div class="aff-note">All values on this panel are fabricated demo data for ${esc(r.short)} (${esc(r.id)}).</div>
+    </div>`;
+  }
+
+  // ── Render: country roll-up ───────────────────────────────────────
+  function affRollupHtml() {
+    const rows = affRows(AFF.state.cycle);
+    const groups = new Map();
+    rows.forEach((r) => {
+      if (!groups.has(r.cc)) groups.set(r.cc, []);
+      groups.get(r.cc).push(r);
+    });
+    const multi = [...groups.values()].filter((g) => g.length > 1);
+    if (!multi.length) return `<div class="icta-empty">No country has more than one affiliate in this cycle.</div>`;
+    return multi.map((g) => {
+      const e = g[0];
+      const cur = g.filter((r) => r.agreement.status === "current").length;
+      const sub = g.filter((r) => r.assessment.status === "submitted" || r.assessment.status === "actions_open").length;
+      const dec = g.filter((r) => r.declaration.status === "submitted" || r.declaration.status === "exceptions_noted").length;
+      const att = g.filter((r) => affAttention(r).length).length;
+      return `<div class="aff-roll">
+        <div class="rh"><span class="flag" aria-hidden="true">${e.flag}</span><b>${esc(e.country)}</b><span>${g.length} entities</span></div>
+        <div class="rline"><span>Agreements current</span><b>${cur}/${g.length}</b></div>
+        <div class="rline"><span>Assessments submitted</span><b>${sub}/${g.length}</b></div>
+        <div class="rline"><span>Declarations submitted</span><b>${dec}/${g.length}</b></div>
+        <div class="rline"><span>Needs attention</span><b>${att}</b></div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Render: master ────────────────────────────────────────────────
+  function renderAff() {
+    const rowsEl = $("#aff-rows");
+    if (!rowsEl) return;
+    // If the open entity was filtered out, close the detail.
+    const visible = affFiltered();
+    if (AFF.state.open && !visible.some((r) => r.id === AFF.state.open)) AFF.state.open = "";
+
+    const stats = $("#aff-stats"); if (stats) stats.innerHTML = affStatsHtml();
+    const prog = $("#aff-progress"); if (prog) prog.innerHTML = affProgressHtml();
+    const tabs = $("#aff-cycle-tabs"); if (tabs) tabs.innerHTML = affCycleHtml();
+    const note = $("#aff-cycle-note");
+    if (note) note.innerHTML = `Showing the <b>${AFF.state.cycle}</b> cycle · demo data`;
+
+    affFillFilters();
+    // Keep the selects in sync when the state was reset programmatically.
+    const map = { "#aff-search": "q", "#aff-region": "region", "#aff-country": "country", "#aff-overall": "overall" };
+    Object.entries(map).forEach(([sel, k]) => { const el = $(sel); if (el && el.value !== AFF.state[k]) el.value = AFF.state[k]; });
+    const at = $("#aff-attention"); if (at) at.checked = !!AFF.state.attention;
+
+    rowsEl.innerHTML = affRowsHtml(visible);
+    const empty = $("#aff-empty"); if (empty) empty.classList.toggle("hidden", visible.length > 0);
+
+    const cl = $("#aff-count-line");
     if (cl) {
       const chips = [];
-      if (ICTA_STATE.q) chips.push(`“${ICTA_STATE.q}”`);
-      if (ICTA_STATE.status) chips.push(ICTA_STATE.status);
-      if (ICTA_STATE.region) chips.push(ICTA_STATE.region);
-      cl.innerHTML = `Showing <b>${rows.length}</b> of ${ICTA_COUNTRIES.length} countries` +
+      if (AFF.state.q) chips.push(`“${AFF.state.q}”`);
+      if (AFF.state.region) chips.push(AFF.state.region);
+      if (AFF.state.country) chips.push(affCountryName(AFF.state.country));
+      if (AFF.state.overall) chips.push(AFF.state.overall === "attention" ? "needs attention" : AFF.state.overall.replace("_", " "));
+      if (AFF.state.attention) chips.push("needs attention only");
+      cl.innerHTML = `Showing <b>${visible.length}</b> of ${AFF.entities.length} affiliates` +
         (chips.length ? ` · filtered by ${esc(chips.join(" · "))}` : "") +
-        ` · <span class="muted">demo data</span>`;
+        ` · <span class="muted">derived overall shown with reason</span>`;
+    }
+
+    const roll = $("#aff-rollup"); if (roll) roll.innerHTML = affRollupHtml();
+  }
+
+  // Legacy #icta / #compliance/icta → rewrite to the new screen path so the
+  // address bar matches what's on screen (history.replaceState, no extra entry).
+  function normalizeAffiliateHash() {
+    const raw = (location.hash || "").replace(/^#/, "").trim();
+    if (raw === "icta" || raw === "compliance/icta") {
+      try { history.replaceState(null, "", "#compliance/affiliates"); } catch (e) { /* ignore */ }
     }
   }
 
-  function wireIcta() {
-    const s = $("#icta-search"), st = $("#icta-status"), rg = $("#icta-region"), rs = $("#icta-reset");
+  function wireAff() {
+    const tabs = $("#aff-cycle-tabs");
+    if (tabs && !tabs.dataset.bound) {
+      tabs.dataset.bound = "1";
+      tabs.addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-cycle]");
+        if (!b) return;
+        const y = Number(b.dataset.cycle);
+        if (!AFF.cycles.includes(y)) return;
+        AFF.state.cycle = y;
+        AFF.state.open = "";
+        renderAff();
+      });
+    }
+
+    const s = $("#aff-search");
     if (s && !s.dataset.bound) {
       s.dataset.bound = "1";
       let t = null;
       s.oninput = () => {
         clearTimeout(t);
-        t = setTimeout(() => { ICTA_STATE.q = s.value; renderIcta(); }, 120);
+        t = setTimeout(() => { AFF.state.q = s.value; renderAff(); }, 120);
       };
     }
-    if (st && !st.dataset.bound) {
-      st.dataset.bound = "1";
-      st.onchange = () => { ICTA_STATE.status = st.value; renderIcta(); };
+    [["#aff-region", "region"], ["#aff-country", "country"], ["#aff-overall", "overall"]].forEach(([sel, k]) => {
+      const el = $(sel);
+      if (el && !el.dataset.bound) {
+        el.dataset.bound = "1";
+        el.onchange = () => { AFF.state[k] = el.value; renderAff(); };
+      }
+    });
+    const at = $("#aff-attention");
+    if (at && !at.dataset.bound) {
+      at.dataset.bound = "1";
+      at.onchange = () => { AFF.state.attention = at.checked; renderAff(); };
     }
-    if (rg && !rg.dataset.bound) {
-      rg.dataset.bound = "1";
-      rg.onchange = () => { ICTA_STATE.region = rg.value; renderIcta(); };
+
+    const rows = $("#aff-rows");
+    if (rows && !rows.dataset.bound) {
+      rows.dataset.bound = "1";
+      const toggle = (id) => {
+        AFF.state.open = AFF.state.open === id ? "" : id;
+        renderAff();
+      };
+      rows.addEventListener("click", (e) => {
+        const m = e.target.closest("[data-toggle]");
+        if (!m) return;
+        toggle(m.dataset.toggle);
+      });
+      rows.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const m = e.target.closest("[data-toggle]");
+        if (!m) return;
+        e.preventDefault();
+        toggle(m.dataset.toggle);
+      });
     }
+
+    const rs = $("#aff-reset");
     if (rs && !rs.dataset.bound) {
       rs.dataset.bound = "1";
       rs.onclick = () => {
-        ICTA_STATE.q = ""; ICTA_STATE.status = ""; ICTA_STATE.region = "";
-        if (s) s.value = ""; if (st) st.value = ""; if (rg) rg.value = "";
-        renderIcta();
+        AFF.state.q = ""; AFF.state.region = ""; AFF.state.country = ""; AFF.state.overall = "";
+        AFF.state.attention = false; AFF.state.open = "";
+        renderAff();
       };
     }
   }
