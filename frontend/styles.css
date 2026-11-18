@@ -675,3 +675,70 @@ html[data-theme="light"] .icta-demo-tag{background:#986300;color:#fff}
   .aff-cycle-note{margin-left:0;width:100%}
   .aff-toolbar select,.aff-toolbar input{max-width:none;width:100%}
 }
+
+/* ICTA demo map */
+.icta-map-card{border:1px solid var(--border);border-radius:14px;background:var(--panel);
+  padding:14px 16px 12px;margin:0 0 18px}
+.icta-map-head{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.icta-map-head h2{margin:0 0 2px;font-size:15px}
+.icta-map-head .small{margin:0;font-size:11.5px}
+.icta-map-views{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.icta-map-views button{border:0;background:var(--bg2);color:var(--muted);font:inherit;font-size:12px;
+  padding:6px 12px;cursor:pointer}
+.icta-map-views button[aria-pressed="true"]{background:rgba(79,140,255,.18);color:var(--text);font-weight:700}
+.icta-map-views button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.icta-map{position:relative;background:radial-gradient(120% 120% at 50% 0%,rgba(79,140,255,.10),transparent 60%),var(--bg2);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.icta-map-svg{display:block;width:100%;height:auto;max-height:min(62vh,520px)}
+.icta-world{fill:rgba(139,150,184,.16);stroke:rgba(139,150,184,.30);stroke-width:.35;vector-effect:non-scaling-stroke}
+.icta-world-dot{fill:rgba(139,150,184,.22)}
+.icta-cty{cursor:pointer;outline:none}
+.icta-cty path,.icta-cty .icta-dot{stroke-width:.6;vector-effect:non-scaling-stroke;transition:opacity .15s ease}
+.icta-cty.current path,.icta-cty.current .icta-dot{fill:rgba(52,211,153,.72);stroke:rgba(52,211,153,.95)}
+.icta-cty.pending path{fill:url(#icta-hatch);stroke:rgba(251,191,36,.95)}
+/* Microstates can't show a hatch at dot size: solid amber, with ~ in the label. */
+.icta-cty.pending .icta-dot{fill:rgba(251,191,36,.85);stroke:rgba(251,191,36,.95)}
+.icta-cty.na path,.icta-cty.na .icta-dot{fill:rgba(139,150,184,.30);stroke:rgba(139,150,184,.85)}
+.icta-cty.none path,.icta-cty.none .icta-dot{fill:rgba(139,150,184,.10);stroke:rgba(139,150,184,.28);cursor:default}
+.icta-cty.none:hover path,.icta-cty.none:hover .icta-dot{stroke:rgba(139,150,184,.4);filter:none}
+.icta-cty .icta-dot{stroke-width:.5;stroke:#0b1020}
+.icta-cty.dim{opacity:.45}
+.icta-cty:hover path,.icta-cty:hover .icta-dot,.icta-cty:focus-visible path,.icta-cty:focus-visible .icta-dot{
+  stroke:var(--blue);stroke-width:1.8;filter:brightness(1.25)}
+.icta-cty:focus-visible{outline:none}
+.icta-cty[aria-pressed="true"] path,.icta-cty[aria-pressed="true"] .icta-dot,
+.icta-cty.sel path,.icta-cty.sel .icta-dot{
+  stroke:#fff;stroke-width:2.2;filter:brightness(1.35);opacity:1}
+.icta-cty.sel{opacity:1}
+.icta-legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:11.5px;color:var(--text)}
+.icta-legend span{display:inline-flex;align-items:center;gap:6px}
+.icta-legend .sw{width:13px;height:13px;border-radius:3px;display:inline-block;border:1px solid transparent}
+.icta-legend .sw.current{background:rgba(52,211,153,.72);border-color:rgba(52,211,153,.95)}
+.icta-legend .sw.pending{background:repeating-linear-gradient(45deg,rgba(251,191,36,.85) 0 2px,rgba(251,191,36,.25) 2px 5px);border-color:rgba(251,191,36,.95)}
+.icta-legend .sw.na{background:rgba(139,150,184,.30);border-color:rgba(139,150,184,.85)}
+.icta-legend .sw.outside{background:rgba(139,150,184,.18);border-color:rgba(139,150,184,.32)}
+.icta-detail{margin-top:10px;padding:9px 12px;border:1px dashed var(--border);border-radius:10px;
+  font-size:12.5px;display:flex;flex-wrap:wrap;gap:7px;align-items:center;min-height:38px}
+.icta-map-credit{margin-top:8px;font-size:10.5px;color:var(--muted);line-height:1.5}
+.icta-map-fallback{padding:28px;text-align:center;color:var(--muted);font-size:12.5px}
+.aff-map-clear{border:0;background:transparent;color:var(--blue);font:inherit;font-size:11.5px;
+  font-weight:600;cursor:pointer;padding:0 0 0 4px;text-decoration:underline}
+.aff-map-clear:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:4px}
+@media (max-width:640px){ .icta-map-svg{max-height:none} .icta-map-card{padding:12px} }
+
+/* Light theme: stronger tints and a dark selection ring so the map stays legible. */
+html[data-theme="light"] .icta-world{fill:#dfe5ee;stroke:#c3cbd8}
+html[data-theme="light"] .icta-cty.none path,html[data-theme="light"] .icta-cty.none .icta-dot{fill:#eaeef5;stroke:#cbd3e0}
+html[data-theme="light"] .icta-cty.current path,html[data-theme="light"] .icta-cty.current .icta-dot{fill:#12a06d;stroke:#0b7a52}
+html[data-theme="light"] .icta-cty.pending path{stroke:#a97b00}
+html[data-theme="light"] .icta-cty.pending .icta-dot{fill:#d9a308;stroke:#a97b00}
+html[data-theme="light"] .icta-cty.na path,html[data-theme="light"] .icta-cty.na .icta-dot{fill:#c3cad6;stroke:#97a1b1}
+html[data-theme="light"] .icta-cty .icta-dot{stroke:#fff}
+html[data-theme="light"] .icta-cty.sel path,html[data-theme="light"] .icta-cty.sel .icta-dot,
+html[data-theme="light"] .icta-cty[aria-pressed="true"] path,html[data-theme="light"] .icta-cty[aria-pressed="true"] .icta-dot{
+  stroke:#12203f;stroke-width:2.2;filter:none}
+html[data-theme="light"] .icta-cty:hover path,html[data-theme="light"] .icta-cty:hover .icta-dot,
+html[data-theme="light"] .icta-cty:focus-visible path,html[data-theme="light"] .icta-cty:focus-visible .icta-dot{
+  stroke:#3168c9;stroke-width:1.8;filter:none}
+html[data-theme="light"] #icta-hatch rect{fill:rgba(217,163,8,.22)}
+html[data-theme="light"] #icta-hatch line{stroke:rgba(169,123,0,.55)}

@@ -1954,8 +1954,8 @@
     };
   }
 
-  function affFiltered() {
-    const S = AFF.state;
+  function affFiltered(overrides) {
+    const S = overrides ? { ...AFF.state, ...overrides } : AFF.state;
     const q = S.q.trim().toLowerCase();
     return affRows(S.cycle).filter((r) => {
       if (q) {
@@ -2175,6 +2175,164 @@
     }).join("");
   }
 
+  // ── Render: demo map (country roll-up of agreement status) ────────
+  //
+  // Geometry is bundled statically in frontend/icta-map.js (window.ICTA_MAP),
+  // built from public-domain Natural Earth 50m Admin-0 shapes by
+  // tools/build_icta_map.py. No tiles, CDN or map library at runtime.
+  // The map shows one country per demo country that has at least one affiliate;
+  // statuses are aggregated from the entity rows and are fabricated sample data.
+
+  // Priority when a country has several entities in different states: anything
+  // outstanding outranks "current"; "not applicable" only wins when no entity
+  // in that country has an agreement at all.
+  const AFF_MAP_PRIORITY = ["pending", "review_due", "current", "not_applicable"];
+
+  const AFF_MAP_SYM = { current: "✓", review_due: "~", pending: "~", not_applicable: "○" };
+  const AFF_MAP_LABEL = {
+    current: "Current", review_due: "Review due", pending: "Pending", not_applicable: "Not applicable",
+  };
+  const AFF_MAP_CLASS = {
+    current: "current", review_due: "pending", pending: "pending", not_applicable: "na",
+  };
+
+  function affMapState() {
+    // Geometry and statuses are always built from the full cycle so the map
+    // never changes shape when filters change; filters only dim countries.
+    const rows = affRows(AFF.state.cycle);
+    const by = new Map();
+    rows.forEach((r) => {
+      if (!by.has(r.cc)) by.set(r.cc, { cc: r.cc, country: r.country, flag: r.flag, rows: [] });
+      by.get(r.cc).rows.push(r);
+    });
+    const out = [];
+    by.forEach((g) => {
+      const statuses = g.rows.map((r) => r.agreement.status);
+      const status = AFF_MAP_PRIORITY.find((s) => statuses.includes(s)) || "current";
+      out.push({ ...g, status, entities: g.rows.length });
+    });
+    return out;
+  }
+
+  function affMapHtml() {
+    const M = window.ICTA_MAP;
+    if (!M || !Array.isArray(M.countries)) {
+      return '<div class="icta-map-fallback">Map geometry unavailable — the affiliate table below carries the same demo data.</div>';
+    }
+    const states = affMapState();
+    const visible = new Set(affFiltered().map((r) => r.cc));
+    const inScope = new Map(states.map((s) => [s.cc, s]));
+    const vb = M.eu.join(" ");
+    const shapes = [];
+    for (const g of M.countries) {
+      if (!g.c) {
+        // Out-of-scope country: neutral context, not interactive.
+        if (g.d) shapes.push(`<path class="icta-world" d="${g.d}"/>`);
+        else if (g.m) shapes.push(`<circle class="icta-world-dot" cx="${g.x}" cy="${g.y}" r="0.7"/>`);
+        continue;
+      }
+      const s = inScope.get(g.c);
+      if (!s) {
+        // Demo-scope country with no affiliate in the current cycle/filter.
+        const inner = g.d
+          ? `<path d="${g.d}"/>`
+          : `<circle class="icta-dot" cx="${g.x}" cy="${g.y}" r="1.6"/>`;
+        const nm = esc(g.n || g.c);
+        shapes.push(`<g class="icta-cty none" data-cc="${g.c}" aria-label="${nm}: no demo affiliate in this view"><title>${nm} — no demo affiliate in this view</title>${inner}</g>`);
+        continue;
+      }
+      const tone = AFF_MAP_CLASS[s.status];
+      const dim = !visible.has(g.c) ? " dim" : "";
+      const sel = AFF.state.country === g.c ? " sel" : "";
+      const label = `${s.country} — ${AFF_MAP_LABEL[s.status]}, ${s.entities} demo ${s.entities === 1 ? "entity" : "entities"} (fabricated sample data)`;
+      const inner = g.d
+        ? `<path d="${g.d}"/>`
+        : `<circle class="icta-dot" cx="${g.x}" cy="${g.y}" r="1.9"/>`;
+      shapes.push(`<g class="icta-cty ${tone}${dim}${sel}" tabindex="0" role="button" data-cc="${g.c}"
+        aria-label="${label}" aria-pressed="${AFF.state.country === g.c}">
+        <title>${esc(s.country)} — ${AFF_MAP_LABEL[s.status]} (${s.entities} demo ${s.entities === 1 ? "entity" : "entities"})</title>${inner}</g>`);
+    }
+    return `<svg class="icta-map-svg" viewBox="${vb}" preserveAspectRatio="xMidYMid meet" role="img"
+      aria-labelledby="aff-map-title aff-map-desc">
+      <title id="aff-map-title">Demo map of affiliate agreement status by country</title>
+      <desc id="aff-map-desc">Fabricated sample data, not real agreements. Countries with a current demo agreement are solid green with a check; pending or review-due countries are amber with a hatch and a tilde; not-applicable countries are grey with a ring; European countries with no affiliate in the current view are faint and not selectable. Selecting a country filters the table below.</desc>
+      <defs>
+        <pattern id="icta-hatch" width="2.4" height="2.4" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+          <rect width="2.4" height="2.4" fill="rgba(251,191,36,.22)"/>
+          <line x1="0" y1="0" x2="0" y2="2.4" stroke="rgba(251,191,36,.62)" stroke-width="0.55"/>
+        </pattern>
+      </defs>
+      <g class="icta-shapes">${shapes.join("")}</g>
+    </svg>`;
+  }
+
+  function affMapLegendHtml() {
+    const states = affMapState();
+    const count = (k) => states.filter((s) => AFF_MAP_CLASS[s.status] === k).length;
+    return `
+      <span role="listitem"><i class="sw current" aria-hidden="true"></i><b aria-hidden="true">✓</b> Agreement current <span class="muted">(demo)</span> — ${count("current")} ${count("current") === 1 ? "country" : "countries"}</span>
+      <span role="listitem"><i class="sw pending" aria-hidden="true"></i><b aria-hidden="true">~</b> Pending / review due <span class="muted">(demo)</span> — ${count("pending")}</span>
+      <span role="listitem"><i class="sw na" aria-hidden="true"></i><b aria-hidden="true">○</b> Not applicable <span class="muted">(demo)</span> — ${count("na")}</span>
+      <span role="listitem"><i class="sw outside" aria-hidden="true"></i> No affiliate in this view — not selectable</span>`;
+  }
+
+  function affMapDetailHtml() {
+    const cc = AFF.state.country;
+    if (!cc) return '<span class="muted">Select a country on the map to filter the table, or use Tab to step through countries with affiliates.</span>';
+    const st = affMapState().find((s) => s.cc === cc);
+    if (!st) return `<b>${esc(affCountryName(cc))}</b> <span class="muted">· no demo affiliate in this view</span>`;
+    const names = st.rows
+      .map((r) => `${esc(r.short)} (${AFF_MAP_LABEL[r.agreement.status].toLowerCase()})`)
+      .join(", ");
+    return `<span aria-hidden="true">${st.flag}</span> <b>${esc(st.country)}</b>
+      <span class="aff-pill ${st.status === "current" ? "green" : st.status === "not_applicable" ? "grey" : "amber"}">${AFF_MAP_SYM[st.status]} ${AFF_MAP_LABEL[st.status]}</span>
+      <span class="muted">· ${st.entities} demo ${st.entities === 1 ? "entity" : "entities"}: ${names}</span>
+      <button type="button" class="aff-map-clear" id="aff-map-clear">Show all countries</button>`;
+  }
+
+  function affMapUpdate() {
+    const wrap = $("#aff-map");
+    if (!wrap) return;
+    wrap.innerHTML = affMapHtml();
+    const legend = $("#aff-map-legend");
+    if (legend) legend.innerHTML = affMapLegendHtml();
+    const detail = $("#aff-map-detail");
+    if (detail) detail.innerHTML = affMapDetailHtml();
+    const svg = wrap.querySelector("svg");
+    if (svg) {
+      svg.addEventListener("click", (e) => {
+        const g = e.target.closest(".icta-cty");
+        if (g && g.dataset.cc) affMapPick(g.dataset.cc);
+      });
+      svg.addEventListener("keydown", (e) => {
+        const g = e.target.closest(".icta-cty");
+        if (!g || !g.dataset.cc) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          affMapPick(g.dataset.cc);
+        }
+      });
+    }
+    const clear = $("#aff-map-clear");
+    if (clear) {
+      clear.onclick = () => {
+        AFF.state.country = "";
+        const cs = $("#aff-country"); if (cs) cs.value = "";
+        renderAff();
+      };
+    }
+  }
+
+  function affMapPick(cc) {
+    // Clicking a country filters the table; clicking the same country clears it.
+    AFF.state.country = AFF.state.country === cc ? "" : cc;
+    const cs = $("#aff-country");
+    if (cs) cs.value = AFF.state.country;
+    renderAff();
+    const card = document.querySelector(`#aff-map .icta-cty[data-cc="${cc}"]`);
+    if (card && document.activeElement !== card && document.activeElement && document.activeElement.closest && document.activeElement.closest("#aff-map")) card.focus();
+  }
+
   // ── Render: master ────────────────────────────────────────────────
   function renderAff() {
     const rowsEl = $("#aff-rows");
@@ -2212,6 +2370,7 @@
     }
 
     const roll = $("#aff-rollup"); if (roll) roll.innerHTML = affRollupHtml();
+    affMapUpdate();
   }
 
   // Legacy #icta / #compliance/icta → rewrite to the new screen path so the

@@ -13,7 +13,7 @@
     document.documentElement.dataset.theme = "dark";
   }
 </script>
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
@@ -370,6 +370,20 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
 
       <div class="icta-stats aff-stats" id="aff-stats"></div>
 
+      <div class="icta-map-card">
+        <div class="icta-map-head">
+          <div>
+            <h2>Demo status map</h2>
+            <p class="small muted">Agreement status per country, aggregated from the demo entities. Select a country to filter the table.</p>
+          </div>
+        </div>
+        <div class="icta-map" id="aff-map"></div>
+        <div class="icta-legend" id="aff-map-legend" role="list" aria-label="Map legend"></div>
+        <div class="icta-detail" id="aff-map-detail" aria-live="polite"></div>
+        <div class="icta-map-credit">Bundled static geometry — Natural Earth 1:50m Admin-0 countries (public domain, naturalearthdata.com). No external tiles or map service. Agreement statuses are fabricated for this demo.</div>
+      </div>
+
+
       <div class="aff-progress-grid" id="aff-progress"></div>
 
       <div class="icta-toolbar aff-toolbar">
@@ -556,6 +570,7 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
   </main>
 </div>
 
-<script src="app.js?v=22"></script>
+<script src="icta-map.js?v=2"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>
