@@ -1059,13 +1059,15 @@
 
   // ---------- PRIVACY NOTICE AUDITOR ----------
   const gradeClass = (g) => "g-" + (["A", "B", "C", "D", "F"].includes(g) ? g : "F");
-  const pctColor = (p) => (p >= 90 ? "#3fb950" : p >= 75 ? "var(--blue)" : p >= 60 ? "#d29922" : "#f85149");
+  // Five bands so D and F are visually distinct.
+  const pctColor = (p) => (p >= 90 ? "#3fb950" : p >= 75 ? "var(--blue)" : p >= 60 ? "#d29922" : p >= 40 ? "#fb923c" : "#f85149");
+  const GRADE_LEGEND = "A ≥90% · B ≥75% · C ≥60% · D ≥40% · F <40% — banded from the weighted checklist pass rate.";
 
   function domainBar(name, d) {
     const color = pctColor(d.pct);
     return `<div style="flex:1;min-width:160px">
       <div style="display:flex;justify-content:space-between;font-size:12.5px">
-        <span>${esc(name)}${d.advisory ? ' <span class="badge" style="font-size:9.5px">advisory</span>' : ""}</span>
+        <span>${esc(name)}${d.advisory ? ' <span class="badge" style="font-size:9.5px" title="Advisory — Swiss FADP results are shown for reference and excluded from the overall grade">advisory</span>' : ""}</span>
         <span class="muted">${d.passed}/${d.total} · ${d.pct}% <b style="color:${color}">${esc(d.grade)}</b></span>
       </div>
       <div class="scorebar"><i style="width:${d.pct}%;background:${color}"></i></div>
@@ -1074,11 +1076,12 @@
 
   function checkRow(c) {
     const failed = !c.passed;
+    const weight = Number(c.weight) > 1 ? ` · weight ${c.weight}` : "";
     return `<div class="chk">
       <div class="mk">${failed ? "❌" : "✅"}</div>
       <div style="flex:1">
         <div style="${failed ? "" : "color:var(--muted)"}">${esc(c.title)}</div>
-        <span class="ref">${esc(c.ref)}${failed ? "" : " · " + esc(c.detail || "")}</span>
+        <span class="ref">${esc(c.ref)}${weight}${failed ? "" : " · " + esc(c.detail || "")}</span>
         ${failed && c.evidence ? `<div class="ev">…${esc(c.evidence)}…</div>` : ""}
       </div>
     </div>`;
@@ -1126,14 +1129,17 @@
         <div style="flex:1;min-width:220px">
           <div style="font-weight:700;font-size:15px">${esc(r.label || r.notice_url || r.requested_url || "Audit")}</div>
           <div class="muted small" style="word-break:break-all">${esc(r.notice_url || "")}</div>
-          <div class="muted small" style="margin-top:4px">${r.monitor_score_suppressed ? "Screening score withheld — this appears to be a notice hub" : `${esc(s.passed_count ?? 0)}/${esc(s.total_count ?? 0)} checks passed · ${esc((r.char_count || 0).toLocaleString())} chars analysed in full`}${r.llm_input_truncated ? ' · <b style="color:#d29922">AI review saw head+tail only</b>' : ""}${r.is_hub ? ' · <b style="color:#d29922">index page, not full notice</b>' : ""}</div>
+          <div class="muted small" style="margin-top:4px">${r.monitor_score_suppressed ? "Screening score withheld — this appears to be a notice hub" : `${esc(s.graded_passed_count ?? s.passed_count ?? 0)}/${esc(s.graded_total_count ?? s.total_count ?? 0)} graded checks passed${s.advisory_count ? ` · +${esc(s.advisory_count)} Swiss advisory` : ""} · ${esc((r.char_count || 0).toLocaleString())} chars analysed in full`}${r.llm_input_truncated ? ' · <b style="color:#d29922">AI review saw head+tail only</b>' : ""}${r.is_hub ? ' · <b style="color:#d29922">index page, not full notice</b>' : ""}</div>
+          <details class="aud-how"><summary class="muted small">How this grade is computed</summary>
+            <div class="muted small" style="margin-top:4px">${GRADE_LEGEND} The overall % pools the weighted checklist across GDPR (15 weight) + ePrivacy (5 weight); it is <b>not</b> an average of the domain grades, so a domain can show a lower letter than the overall grade. Swiss FADP is advisory and excluded from the overall %.</div>
+          </details>
         </div>
       </div>
       <div style="display:flex;gap:18px;flex-wrap:wrap;margin:16px 0 4px">
         ${order.filter((k) => dom[k]).map((k) => domainBar(k, dom[k])).join("")}
       </div>
       ${r.monitor_id ? `<div class="aud-disclaimer" style="margin-top:12px">Automated text-pattern screening only — not a legal opinion or determination of compliance.</div>` : ""}
-      ${r.review_changes ? `<div class="aud-change-box"><b>Scan comparison</b><div class="muted small">${(r.review_changes.new_findings || []).length} new finding(s) · ${(r.review_changes.recovered || []).length} recovered · ${(r.review_changes.ongoing || r.review_changes.still_failing || []).length} ongoing</div>${(r.created_reviews || []).length ? `<ul>${r.created_reviews.map(x => `<li><span class="pill ${esc(x.severity || "low")}">${esc(x.severity || "low")}</span> ${esc(x.title)}</li>`).join("")}</ul>` : ""}</div>` : ""}
+      ${r.monitor_id && r.review_changes ? `<div class="aud-change-box"><b>Scan comparison (vs previous scan)</b><div class="muted small">${(r.review_changes.new_findings || []).length} new finding(s) · ${(r.review_changes.recovered || []).length} recovered · ${(r.review_changes.ongoing || r.review_changes.still_failing || []).length} still failing from previous scan</div>${(r.created_reviews || []).length ? `<ul>${r.created_reviews.map(x => `<li><span class="pill ${esc(x.severity || "low")}">${esc(x.severity || "low")}</span> ${esc(x.title)}</li>`).join("")}</ul>` : ""}</div>` : ""}
       ${warnHtml}
       <h3 style="margin:18px 0 6px;font-size:14px">❌ Gaps (${fails.length})</h3>
       ${fails.length ? fails.map(checkRow).join("") : '<p class="muted small">No checklist failures. 🎉</p>'}
@@ -1241,7 +1247,7 @@
 
   function renderMonitors(data) {
     const t=data.totals||{}; const sites=data.monitors||[];
-    $("#mon-kpis").innerHTML=`<div class="mon-kpi"><b>${esc(t.sites||0)}</b><span>websites</span></div><div class="mon-kpi"><b>${t.avg_score==null?"—":esc(t.avg_score)+"%"}</b><span>avg screening score</span></div><div class="mon-kpi ${t.high_pending?"alert":""}"><b>${esc(t.pending||0)}</b><span>pending review</span></div><div class="mon-kpi"><b>${esc(t.high_pending||0)}</b><span>high priority</span></div>`;
+    $("#mon-kpis").innerHTML=`<div class="mon-kpi"><b>${esc(t.sites||0)}</b><span>websites</span></div><div class="mon-kpi" title="Pooled average of each site's latest screening score. Sites differ in jurisdiction and notice scope, so treat it as a rough overview."><b>${t.avg_score==null?"—":esc(t.avg_score)+"%"}</b><span>avg screening score</span></div><div class="mon-kpi ${t.high_pending?"alert":""}"><b>${esc(t.pending||0)}</b><span>pending review</span></div><div class="mon-kpi"><b>${esc(t.high_pending||0)}</b><span>high priority</span></div>`;
     $("#mon-sites").innerHTML=sites.length?sites.map(m=>{
       const status=m.last_status||"scheduled",grade=m.last_grade||"—";
       return `<article class="card mon-site"><div class="mon-site-top"><div class="mon-site-id"><b>${esc(m.label)}</b><a href="${esc(m.site_url)}" target="_blank" rel="noopener">${esc(m.site_url)}</a>${m.notice_url?`<a class="mon-notice-url" href="${esc(m.notice_url)}" target="_blank" rel="noopener">Notice: ${esc(m.notice_url)}</a>`:""}</div><div class="grade-badge ${monitorGradeClass(grade)}" title="Screening only"><span class="g">${esc(grade)}</span><span class="p">${m.last_score==null?"—":esc(m.last_score)+"%"}</span></div></div>
@@ -1249,6 +1255,9 @@
       <div class="mon-actions"><button class="btn small primary" data-mon-scan="${esc(m.id)}">Scan now</button><button class="btn small" data-mon-toggle="${esc(m.id)}" data-enabled="${m.enabled?"1":"0"}">${m.enabled?"Pause":"Resume"}</button><button class="btn small red" data-mon-delete="${esc(m.id)}">Remove</button></div></article>`;
     }).join(""):'<div class="card muted small">No websites tracked yet. Add one above to start monitoring.</div>';
     const reviews=data.reviews||[];
+    const KIND_LABEL = { initial_finding: "New gap", new_finding: "New gap", regression: "Regression", reopened: "Recurring", recovered: "Recovered" };
+    const kindLabel = (k) => KIND_LABEL[String(k || "").toLowerCase()] || String(k || "").replace(/_/g, " ");
+    const reviewLegend = `<div class="mon-review-legend muted small">New gap = first time failing · Regression = passed last scan, failing now · Recurring = failed, recovered, then failed again · Still failing = failing in consecutive scans. Repeat scans never duplicate an open queue item.</div>`;
     const reviewDetailHtml = (detail) => {
       const lines = String(detail || "").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
       if (!lines.length) return "";
@@ -1260,7 +1269,7 @@
         ${scope ? `<p class="mon-review-scope">⚠ ${esc(scope.replace(/^Scope warning:\s*/i, ""))}</p>` : ""}
         ${extra.length ? `<details class="mon-review-more"><summary>Why it matters · what to verify</summary><div>${extra.map(x => `<p>${esc(x)}</p>`).join("")}</div></details>` : ""}</div>`;
     };
-    $("#mon-reviews").innerHTML=reviews.length?`<div class="mon-review-list">${reviews.map(r=>{const m=sites.find(x=>String(x.id)===String(r.monitor_id));return `<article class="mon-review"><div class="mon-review-head"><span class="pill ${esc(r.severity)}">${esc(r.severity)}</span><b>${esc(r.title)}</b></div><div class="muted small">${esc(m?.label||"Website")} · ${esc(String(r.kind).replace(/_/g," "))} · ${esc(new Date(r.created_at).toLocaleString())}</div>${reviewDetailHtml(r.detail)}<div class="mon-actions"><button class="btn small" data-mon-review="${esc(r.id)}" data-status="in_review">Reviewing</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="resolved">Resolve</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="accepted">Accept risk</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="false_positive">False positive</button></div></article>`}).join("")}</div>`:'<div class="card muted small">✨ Review queue clear — no pending findings.</div>';
+    $("#mon-reviews").innerHTML=reviews.length?`${reviewLegend}<div class="mon-review-list">${reviews.map(r=>{const m=sites.find(x=>String(x.id)===String(r.monitor_id));return `<article class="mon-review"><div class="mon-review-head"><span class="pill ${esc(r.severity)}">${esc(r.severity)}</span><b>${esc(r.title)}</b></div><div class="muted small">${esc(m?.label||"Website")} · ${esc(kindLabel(r.kind))} · ${esc(new Date(r.created_at).toLocaleString())}</div>${reviewDetailHtml(r.detail)}<div class="mon-actions"><button class="btn small" data-mon-review="${esc(r.id)}" data-status="in_review">Reviewing</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="resolved">Resolve</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="accepted">Accept risk</button><button class="btn small" data-mon-review="${esc(r.id)}" data-status="false_positive">False positive</button></div></article>`}).join("")}</div>`:'<div class="card muted small">✨ Review queue clear — no pending findings.</div>';
     wireMonitorActions();
   }
 
@@ -1296,7 +1305,7 @@
     const avg = s.avg_score == null ? "—" : s.avg_score + "%";
     const last = s.last_scan_at ? new Date(s.last_scan_at).toLocaleDateString() : "never";
     return `<span><b>${esc(s.sites ?? 0)}</b> tracked</span>
-      <span><b>${esc(avg)}</b> avg score</span>
+      <span title="Pooled average of each website's latest screening score. Sites use different jurisdictions and notice scopes, so this is a rough overview only, not a comparable benchmark."><b>${esc(avg)}</b> avg score</span>
       <span class="${s.pending ? "warn" : ""}"><b>${esc(s.pending ?? 0)}</b> to review</span>
       <span class="muted">last scan ${esc(last)}</span>`;
   }
@@ -1305,7 +1314,7 @@
     const g = (s && s.grades) || {};
     const total = Object.values(g).reduce((a, b) => a + b, 0);
     if (!total) return "";
-    return `<div class="hub-grades">${["A", "B", "C", "D", "F"].filter((k) => g[k])
+    return `<div class="hub-grades" title="Count of monitored websites by latest letter grade. Grades band the weighted checklist pass rate: A ≥90% · B ≥75% · C ≥60% · D ≥40% · F <40%.">${["A", "B", "C", "D", "F"].filter((k) => g[k])
       .map((k) => `<span class="grade-badge tiny ${gradeClass(k)}"><span class="g">${k}</span><span class="p">${g[k]}</span></span>`).join("")}</div>`;
   }
 
@@ -1408,7 +1417,7 @@
         ${order.filter((k) => dom[k]).map((k) => domainBar(k, dom[k])).join("")}
       </div>
       ${cookieSignalsBlock(r.signals)}
-      ${r.review_changes && (r.review_changes.new_findings || []).length ? `<div class="aud-change-box"><b>Scan comparison</b><div class="muted small">${r.review_changes.new_findings.length} new finding(s) · ${(r.review_changes.recovered || []).length} recovered · ${(r.review_changes.still_failing || []).length} ongoing</div></div>` : ""}
+      ${r.review_changes && (r.review_changes.new_findings || []).length ? `<div class="aud-change-box"><b>Scan comparison (vs previous scan)</b><div class="muted small">${r.review_changes.new_findings.length} new finding(s) · ${(r.review_changes.recovered || []).length} recovered · ${((r.review_changes.ongoing || r.review_changes.still_failing) || []).length} still failing from previous scan</div></div>` : ""}
       ${warnHtml}
       <h3 style="margin:18px 0 6px;font-size:14px">❌ Gaps (${fails.length})</h3>
       ${fails.length ? fails.map(checkRow).join("") : '<p class="muted small">No checklist failures. 🎉</p>'}

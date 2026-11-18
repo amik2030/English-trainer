@@ -313,10 +313,17 @@ def score(results: list[dict]) -> dict:
 
     graded = [d for n, d in by_domain.items() if not d["advisory"]]
     overall = pct(sum(d["weight_passed"] for d in graded), sum(d["weight_total"] for d in graded))
+    graded_ids = {r["id"] for r in results if not by_domain.get(r["domain"], {}).get("advisory")}
     return {
         "overall_pct": overall,
         "overall_grade": grade_for(overall),
         "domains": by_domain,
+        # Counts over graded (non-advisory) checks only, so the headline "x/y" matches
+        # the denominator behind overall_pct. Advisory checks are reported separately.
+        "graded_passed_count": sum(1 for r in results if r["passed"] and r["id"] in graded_ids),
+        "graded_total_count": len(graded_ids),
+        "advisory_count": sum(1 for r in results if r["id"] not in graded_ids),
+        "graded_weight_total": sum(d["weight_total"] for d in graded),
         "failed": [{"id": r["id"], "domain": r["domain"], "ref": r["ref"], "title": r["title"]}
                    for r in results if not r["passed"]],
         "passed_count": sum(1 for r in results if r["passed"]),

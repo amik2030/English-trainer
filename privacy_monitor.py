@@ -302,11 +302,6 @@ def compare_results(previous: dict[str, Any] | None,
         item["check"] = current_all.get(item["finding_key"], {})
 
     return {"new_findings": added, "recovered": recovered,
-            "still_failing": [
-                {"finding_key": key, "title": check.get("title") or key,
-                 "ref": check.get("ref"), "severity": severity(check)}
-                for key, check in new_failed.items() if key in old_failed
-            ],
             "ongoing": [
                 {"finding_key": key, "title": check.get("title") or key,
                  "ref": check.get("ref"), "severity": severity(check)}

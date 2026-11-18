@@ -1250,7 +1250,8 @@ async def auditor_scan(req: AuditRequest, request: Request):
     result["label"] = (req.label or "").strip()[:200] or None
     result["trigger"] = "manual"
     result["monitor_id"] = None
-    result["review_changes"] = {"new_findings": [], "recovered": [], "still_failing": [], "ongoing": []}
+    # One-off scans have no previous scan to compare against, so no comparison block.
+    result["review_changes"] = None
     ins = admin.table("notice_scans").insert({
         "user_id": prof["id"],
         "label": result["label"],
