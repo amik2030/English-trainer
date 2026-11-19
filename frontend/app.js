@@ -712,13 +712,13 @@
   });
 
   // ---------- KB — KNOWLEDGE NAVIGATOR ----------
-  const KB = { items: [], sources: [], node: null, search: "", jur: "", caselaw: false };
+  const KB = { items: [], sources: [], node: null, search: "", jur: "", caselaw: false, tags: [], rel: [] };
 
   function countUnder(prefix) {
     // direct = tagged with exactly this node; total = tagged with this node or any descendant
     let direct = 0, total = 0, srcTot = 0;
     const pfx = prefix + ".";
-    const pool = KB.caselaw ? KB.items.filter(isCaseLaw) : KB.items;
+    const pool = kbCurrentPool();
     for (const it of pool) {
       const ids = it.taxonomy_ids || [];
       if (ids.some((i) => i === prefix)) direct++;
@@ -808,6 +808,8 @@
       el.addEventListener("click", () => kbSelect(el.dataset.node)));
   }
 
+  function kbCurrentPool() { return KB.caselaw ? KB.items.filter(isCaseLaw) : KB.items; }
+
   function kbSearchItems() {
     const q = KB.search.toLowerCase();
     return KB.items.filter((it) =>
@@ -863,6 +865,11 @@
       if (KB.jur) items = items.filter((it) => (it.sources?.jurisdiction || it.source_jur || "") === KB.jur);
     }
     if (KB.caselaw) items = items.filter(isCaseLaw);
+    if (KB.tags.length) items = items.filter((it) => KB.tags.every((t) => (it.tags || []).includes(t)));
+    if (KB.rel.length) {
+      const relset = new Set(KB.rel);
+      items = items.filter((it) => (it.taxonomy_ids || []).some((t) => relset.has(t)));
+    }
     if (KB.node && !KB.search && !items.length) {
       if (KB.caselaw) {
         el.innerHTML = `<div class="card" style="border-left:4px solid var(--amber,#d29922)">
@@ -870,6 +877,7 @@
           <p class="muted">No case law in this area yet.</p>
           <p class="muted small">Turn off ⚖️ Case law only to see the other notes, or add a judgment source and extract it.</p>
         </div>`;
+        kbSideRender();
         return;
       }
       el.innerHTML = `<div class="card" style="border-left:4px solid var(--amber,#d29922)">
@@ -879,6 +887,7 @@
           ? 'Use 🛡 Review → “Add knowledge”, tag it ' + esc(KB.node) + ', or extract knowledge from an approved source covering this area.'
           : 'Ask a question in ⚡ Ask — if the KB can\'t answer, it lands in the curation backlog.'}</p>
       </div>`;
+      kbSideRender();
       return;
     }
     let label = KB.node ? (TAX?.nodes?.[KB.node] || KB.node) : (KB.search ? `search: “${esc(KB.search)}”` : "All knowledge");
@@ -889,7 +898,9 @@
       <span class="badge">${items.length} notes</span>
       <span class="badge blue">${srcs.size} sources</span>
     </div>`;
-    el.innerHTML = head + (items.length ? items.map(kbNoteCard).join("") : '<p class="muted">No matches. Try clearing the search or jurisdiction lens.</p>');
+    KB.filtered = items;
+    el.innerHTML = head + (items.length ? items.map(kbNoteCard).join("") : '<p class="muted">No matches. Try clearing the filters, search or jurisdiction lens.</p>');
+    kbSideRender();
   }
 
   function kbRenderCrumb() {
@@ -905,8 +916,126 @@
     cr.querySelectorAll("a[data-node]").forEach((a) => a.addEventListener("click", () => kbSelect(a.dataset.node || "")));
   }
 
+  // ---------- KB Refine side panel ----------
+  function kbScopePool() {   // scope = caselaw pool + node/search/jurisdiction (before facet filters)
+    let items = kbCurrentPool();
+    if (KB.search) {
+      items = kbSearchItems();
+      if (KB.jur) items = items.filter((it) => (it.sources?.jurisdiction || it.source_jur || "") === KB.jur);
+    } else if (KB.node) {
+      items = items.filter((it) => (it.taxonomy_ids || []).some((i) => i === KB.node || String(i).startsWith(KB.node + ".")));
+    } else if (KB.jur) {
+      items = items.filter((it) => (it.sources?.jurisdiction || it.source_jur || "") === KB.jur);
+    }
+    return items;
+  }
+
+  function kbFacetCounts(scope) {
+    let pool = scope;
+    if (KB.tags.length) pool = pool.filter((it) => KB.tags.every((t) => (it.tags || []).includes(t)));
+    if (KB.rel.length) {
+      const rset = new Set(KB.rel);
+      pool = pool.filter((it) => (it.taxonomy_ids || []).some((t) => rset.has(t)));
+    }
+    return pool;
+  }
+
+  function kbSideRender() {
+    const el = $("#kb-side");
+    if (!el) return;
+    KB.filtered = KB.filtered || [];
+    if (!KB.node && !KB.search) { KB.tags = [], KB.rel = []; el.classList.add("hidden"); el.innerHTML = ""; return; }
+    const scope = kbScopePool();
+    const out = kbFacetCounts(scope);
+    const cntCls = (n) => n >= 5 ? " g" : n >= 1 ? " a" : " m";
+    let html = "";
+
+    // --- Tag filter (AND) ---
+    const tagT = new Map();
+    for (const it of scope) for (const t of it.tags || []) tagT.set(t, (tagT.get(t) || 0) + 1);
+    const tags = [...tagT.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    html += '<div class="kb-ref-sec"><div class="kb-ref-head">Tag filter · all of</div>';
+    if (tags.length) {
+      html += '<div class="kb-chips">' + tags.map(([t, n]) => {
+        const on = KB.tags.includes(t);
+        const eff = out.filter((it) => (it.tags || []).includes(t)).length;
+        const sz = n >= 12 ? "" : n >= 5 ? " sm" : " xs";
+        return `<button type="button" class="kb-fchip${sz}${on ? " f" : ""}${!on && eff === 0 ? " o" : ""}" data-tag="${esc(t)}" title="${esc(t)}">${esc(t.length > 22 ? t.slice(0, 21) + "…" : t)} <small>${on ? eff : n}</small></button>`;
+      }).join("") + "</div>";
+    } else html += '<p class="kb-ref-empty">No tags on these notes.</p>';
+    if (KB.tags.length) html += `<button type="button" class="kb-ref-clear" data-fclear="tags">✕ clear ${KB.tags.length} tag${KB.tags.length > 1 ? "s" : ""}</button>`;
+    html += "</div>";
+
+    // --- Branches: sub-branches + nearby siblings ---
+    let branches = "";
+    if (!KB.search) {
+      const base = KB.node || "";
+      const kids = nodeChildren(base)
+        .map((k) => ({ id: k, label: TAX?.nodes?.[k] || k, n: countUnder(k) }))
+        .filter((k) => k.n.total > 0);
+      if (kids.length) branches += '<div class="kb-ref-head">Drill down</div>' + kids.map((k) =>
+        `<div class="kb-ref-link" data-branch="${esc(k.id)}" role="button" tabindex="0"><span class="kb-ref-ico">↳</span><span>${esc(k.label.length > 34 ? k.label.slice(0, 32) + "…" : k.label)}</span><span class="cnt${cntCls(k.n.total)}">${k.n.total}</span></div>`).join("");
+      const parent = base.includes(".") ? base.slice(0, base.lastIndexOf(".")) : "";
+      const sibs = (parent ? nodeChildren(parent).filter((k) => k !== base) : base ? ["A","B","C","D","Z"].filter((t) => TAX?.nodes?.[t] && t !== base) : [])
+        .map((k) => ({ id: k, label: TAX?.nodes?.[k] || k, n: countUnder(k) }))
+        .filter((k) => k.n.total > 0 && k.id !== base);
+      if (sibs.length) {
+        branches += (kids.length ? '<div class="kb-ref-head" style="margin-top:12px">Jump to</div>' : '<div class="kb-ref-head">Jump to</div>')
+          + sibs.map((k) =>
+          `<div class="kb-ref-link dim" data-branch="${esc(k.id)}" role="button" tabindex="0"><span class="kb-ref-ico">${parent ? "·" : "📁"}</span><span>${esc(k.label.length > 34 ? k.label.slice(0, 32) + "…" : k.label)}</span><span class="cnt${cntCls(k.n.total)}">${k.n.total}</span></div>`).join("");
+      }
+    }
+    if (branches) html += '<div class="kb-ref-sec">' + branches + "</div>";
+
+    // --- Related areas (co-tagged nodes, intersect) ---
+    const under = {};
+    for (const it of out) for (const t of it.taxonomy_ids || []) (under[t] = under[t] || new Set()).add(it);
+    const nodePfx = KB.node ? KB.node + "." : "";
+    let relBody = "";
+    if (KB.rel.length) {
+      relBody = '<div class="kb-chips">' + KB.rel.map((t) =>
+        `<button type="button" class="kb-fchip f" data-rel="${esc(t)}" title="Stop intersecting ${esc(TAX?.nodes?.[t] || t)}">${esc(TAX?.nodes?.[t] || t)} <small>${(under[t] || new Set()).size}</small></button>`).join("") + "</div>";
+    }
+    const rels = Object.keys(under)
+      .filter((t) => TAX?.nodes?.[t] && t !== KB.node)
+      .filter((t) => !(KB.node && (t.startsWith(nodePfx) || KB.node.startsWith(t + "."))))
+      .map((t) => ({ id: t, label: TAX.nodes[t], n: under[t].size }))
+      .sort((a, b) => b.n - a.n || a.id.localeCompare(b.id))
+      .slice(0, 8)
+      .filter((t) => !KB.rel.includes(t.id));
+    if (rels.length) {
+      relBody += (relBody ? '<div class="kb-chips" style="margin-top:6px">' : '<div class="kb-chips">') + rels.map((t) =>
+        `<button type="button" class="kb-fchip sm" data-rel="${esc(t.id)}" title="Intersect with ${esc(t.label)}">${esc(t.label.length > 26 ? t.label.slice(0, 25) + "…" : t.label)} <small>${t.n}</small></button>`).join("") + "</div>";
+    }
+    if (relBody) {
+      html += '<div class="kb-ref-sec"><div class="kb-ref-head">Related areas · overlap</div>' + relBody;
+      if (KB.rel.length) html += '<button type="button" class="kb-ref-clear" data-fclear="rel">✕ clear overlap</button>';
+      html += "</div>";
+    }
+
+    el.innerHTML = html;
+    el.classList.remove("hidden");
+    $$(".kb-fchip[data-tag]", el).forEach((b) => b.addEventListener("click", () => {
+      const t = b.dataset.tag;
+      KB.tags = KB.tags.includes(t) ? KB.tags.filter((x) => x !== t) : KB.tags.concat([t]);
+      kbRenderContent(); kbSideRender();
+    }));
+    $$(".kb-fchip[data-rel]", el).forEach((b) => b.addEventListener("click", () => {
+      const t = b.dataset.rel;
+      KB.rel = KB.rel.includes(t) ? KB.rel.filter((x) => x !== t) : KB.rel.concat([t]);
+      kbRenderContent(); kbSideRender();
+    }));
+    $$(".kb-ref-link[data-branch]", el).forEach((b) => b.addEventListener("click", () => kbSelect(b.dataset.branch)));
+    $$(".kb-ref-clear", el).forEach((b) => b.addEventListener("click", () => {
+      if (b.dataset.fclear === "tags") KB.tags = [];
+      else if (b.dataset.fclear === "rel") KB.rel = [];
+      kbRenderContent(); kbSideRender();
+    }));
+  }
+
   function kbSelect(nodeId) {
     KB.node = nodeId || null;
+    KB.tags = [], KB.rel = [];
     if (nodeId) KB.search = "", $("#kb-search").value = "";
     kbRenderTree(KB.node);
     kbRenderCrumb();
@@ -924,16 +1053,16 @@
       $("#kb-jur").innerHTML = '<option value="">🌐 All jurisdictions</option>' + jurs.map((j) => `<option${j === cur ? " selected" : ""}>${j}</option>`).join("");
       if (!KB._wiredSearch) {
         KB._wiredSearch = true;
-        $("#kb-search").addEventListener("input", () => { KB.search = $("#kb-search").value.trim(); kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); });
-        $("#kb-jur").addEventListener("change", () => { KB.jur = $("#kb-jur").value; kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); });
+        $("#kb-search").addEventListener("input", () => { KB.search = $("#kb-search").value.trim(); kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); kbSideRender(); });
+        $("#kb-jur").addEventListener("change", () => { KB.jur = $("#kb-jur").value; kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); kbSideRender(); });
         $("#kb-caselaw")?.addEventListener("click", () => {
           KB.caselaw = !KB.caselaw;
           $("#kb-caselaw").classList.toggle("primary", KB.caselaw);
-          kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent();
+          kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); kbSideRender();
         });
       }
       if (!KB.node && !KB.search) { kbRenderTree(""); kbRenderContent(); }
-      else { kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); }
+      else { kbRenderTree(KB.node); kbRenderCrumb(); kbRenderContent(); kbSideRender(); }
     } catch (e) { $("#kb-content").innerHTML = `<p style="color:var(--red)">${esc(e.message)}</p>`; }
   }
 

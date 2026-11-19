@@ -13,7 +13,7 @@
     document.documentElement.dataset.theme = "dark";
   }
 </script>
-<link rel="stylesheet" href="styles.css?v=14">
+<link rel="stylesheet" href="styles.css?v=15">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* app-specific additions */
@@ -243,7 +243,8 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
 
       <div class="kb-layout">
         <aside class="kb-tree" id="kb-tree"><span class="spin"></span></aside>
-        <div class="kb-content" id="kb-content"><span class="spin"></span></div>
+        <div class="kb-content kb-ann" id="kb-content"><span class="spin"></span></div>
+        <aside class="kb-side hidden" id="kb-side"></aside>
       </div>
     </section>
 
@@ -556,6 +557,6 @@ html[data-theme="light"] .tab.active { color:#244d91; border-color:rgba(49,104,2
   </main>
 </div>
 
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>
